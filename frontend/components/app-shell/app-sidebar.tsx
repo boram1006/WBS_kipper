@@ -81,7 +81,7 @@ export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
         <button type="button" className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-zinc-100">
           <div className="grid h-7 w-7 place-items-center rounded-full bg-zinc-950 text-[11px] font-semibold text-white">JK</div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-semibold text-zinc-950">정경민</p>
+            <p className="truncate text-[12px] font-semibold text-zinc-950">최보람</p>
             <p className="truncate text-[11px] text-zinc-400">PM · AI UX Review</p>
           </div>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
