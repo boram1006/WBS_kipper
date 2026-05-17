@@ -1,8 +1,25 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Pretendard:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --font-sans: "Inter", "Pretendard", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --brand: #FD312E;
+  --ink: #0A0A0A;
+  --fg: #09090B;
+  --fg-2: #3F3F46;
+  --fg-3: #71717A;
+  --fg-4: #A1A1AA;
+  --bg: #FAFAF9;
+  --surface: #FFFFFF;
+  --surface-2: #F4F4F5;
+  --surface-3: #FAFAFA;
+  --line: #ECECEE;
+  --line-2: #E4E4E7;
+  --line-3: #D4D4D8;
   --background: 0 0% 100%;
   --foreground: 222 47% 11%;
   --muted: 210 40% 96%;
@@ -17,7 +34,28 @@
 }
 
 body {
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01", "ss03";
+  letter-spacing: -0.01em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
