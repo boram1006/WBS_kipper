@@ -7,8 +7,9 @@ type NavItem = {
 };
 
 const items: NavItem[] = [
-  { label: "WBS Upload", href: routes.upload },
-  { label: "Meeting Note", href: routes.meetingNote },
+  { label: "Current WBS", href: routes.wbs },
+  { label: "Import WBS", href: routes.upload },
+  { label: "Meeting Input", href: routes.meetingNote },
   { label: "Update Review", href: routes.review },
   { label: "Change History", href: routes.history }
 ];

@@ -1,17 +1,9 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  CheckSquare,
-  ChevronsUpDown,
-  Folder,
-  GitBranch,
-  History,
-  LayoutDashboard,
-  Mic,
-  Settings
-} from "lucide-react";
+import { CheckSquare, ChevronsUpDown, ClipboardList, GitBranch, History, Mic, Table2 } from "lucide-react";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +20,7 @@ function NavItem({
   badge
 }: {
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   active?: boolean;
   badge?: number;
@@ -54,12 +46,11 @@ function NavItem({
 
 export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
   const pathname = usePathname();
+  const wbsPath = routes.wbs(projectId);
+  const uploadPath = routes.upload(projectId);
+  const meetingPath = routes.meetingNote(projectId);
   const reviewPath = routes.review(projectId);
   const historyPath = routes.history(projectId);
-  const isWbs = pathname === "/upload";
-  const isMeeting = pathname === "/meeting-note";
-  const isReview = pathname === "/review";
-  const isHistory = pathname === "/history";
 
   return (
     <aside className="flex w-[240px] shrink-0 flex-col border-r border-zinc-200 bg-white px-4 py-5">
@@ -73,26 +64,21 @@ export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
 
       <nav className="flex-1 space-y-5 overflow-y-auto">
         <div>
-          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">Workspace</p>
+          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">WBS Workflow</p>
           <div className="space-y-0.5">
-            <NavItem href="/" icon={LayoutDashboard} label="Dashboard" />
-            <NavItem href={routes.project(projectId)} icon={Folder} label="Projects" />
-            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="WBS" active={isWbs} />
-            <NavItem href={routes.meetingNote(projectId)} icon={Mic} label="Meetings" active={isMeeting} />
+            <NavItem href={wbsPath} icon={Table2} label="Current WBS" active={pathname === "/wbs"} />
+            <NavItem href={uploadPath} icon={GitBranch} label="Import WBS" active={pathname === "/upload"} />
+            <NavItem href={meetingPath} icon={Mic} label="Meeting Input" active={pathname === "/meeting-note"} />
+            <NavItem href={reviewPath} icon={CheckSquare} label="Update Review" active={pathname === "/review"} badge={pendingCount} />
+            <NavItem href={historyPath} icon={History} label="Change History" active={pathname === "/history"} />
           </div>
         </div>
 
         <div>
-          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">Review</p>
+          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">Project</p>
           <div className="space-y-0.5">
-            <NavItem href={reviewPath} icon={CheckSquare} label="Update Review" active={isReview} badge={pendingCount} />
-            <NavItem href={historyPath} icon={History} label="Change History" active={isHistory} />
+            <NavItem href={routes.project(projectId)} icon={ClipboardList} label="Project Detail" active={pathname === "/project"} />
           </div>
-        </div>
-
-        <div>
-          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">Account</p>
-          <NavItem href="/" icon={Settings} label="Settings" />
         </div>
       </nav>
 

@@ -28,6 +28,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function requestText(path: string, init?: RequestInit): Promise<string> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Request failed: ${response.status}`);
+  }
+  return response.text();
+}
+
 export const api = {
   createProject: (payload: ProjectCreateRequest) =>
     request<ProjectResponse>("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
@@ -62,6 +75,8 @@ export const api = {
     }),
 
   getHistory: (projectId: string | number) => request<ChangeHistoryResponse>(`/api/projects/${projectId}/history`),
+
+  downloadWbsCsvText: (projectId: string | number) => requestText(`/api/projects/${projectId}/wbs/download`),
 
   downloadWbsUrl: (projectId: string | number) => `${API_BASE}/api/projects/${projectId}/wbs/download`
 };
