@@ -46,11 +46,6 @@ function NavItem({
 
 export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
   const pathname = usePathname();
-  const wbsPath = routes.wbs(projectId);
-  const uploadPath = routes.upload(projectId);
-  const meetingPath = routes.meetingNote(projectId);
-  const reviewPath = routes.review(projectId);
-  const historyPath = routes.history(projectId);
 
   return (
     <aside className="flex w-[240px] shrink-0 flex-col border-r border-zinc-200 bg-white px-4 py-5">
@@ -66,11 +61,11 @@ export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
         <div>
           <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">WBS Workflow</p>
           <div className="space-y-0.5">
-            <NavItem href={wbsPath} icon={Table2} label="Current WBS" active={pathname === "/wbs"} />
-            <NavItem href={uploadPath} icon={GitBranch} label="Import WBS" active={pathname === "/upload"} />
-            <NavItem href={meetingPath} icon={Mic} label="Meeting Input" active={pathname === "/meeting-note"} />
-            <NavItem href={reviewPath} icon={CheckSquare} label="Update Review" active={pathname === "/review"} badge={pendingCount} />
-            <NavItem href={historyPath} icon={History} label="Change History" active={pathname === "/history"} />
+            <NavItem href={routes.wbs(projectId)} icon={Table2} label="Current WBS" active={pathname === "/wbs"} />
+            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="Import WBS" active={pathname === "/upload"} />
+            <NavItem href={routes.meetingNote(projectId)} icon={Mic} label="Meeting Input" active={pathname === "/meeting-note"} />
+            <NavItem href={routes.review(projectId)} icon={CheckSquare} label="Update Review" active={pathname === "/review"} badge={pendingCount} />
+            <NavItem href={routes.history(projectId)} icon={History} label="Change History" active={pathname === "/history"} />
           </div>
         </div>
 
