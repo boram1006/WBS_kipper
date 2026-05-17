@@ -14,6 +14,7 @@ import {
   GitBranch,
   History,
   Info,
+  Play,
   Search,
   Sparkles,
   Table2,
@@ -27,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { useProjectIdFromQuery } from "@/lib/use-project-id";
+import { setActiveProjectId, useProjectIdFromQuery } from "@/lib/use-project-id";
 import { cn } from "@/lib/utils";
 
 type WbsRow = {
@@ -248,6 +249,7 @@ export default function CurrentWbsPage() {
   const [loading, setLoading] = useState(true);
   const [usingMock, setUsingMock] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -321,6 +323,25 @@ export default function CurrentWbsPage() {
     window.location.href = api.downloadWbsUrl(projectId);
   }
 
+  async function startDemo() {
+    setDemoLoading(true);
+    setError(null);
+    try {
+      const demo = await api.startDemo();
+      setActiveProjectId(demo.project.id);
+      setRows(MOCK_ROWS);
+      setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
+      setUsingMock(true);
+    } catch (err) {
+      setRows(MOCK_ROWS);
+      setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
+      setUsingMock(true);
+      setError(err instanceof Error ? err.message : "샘플 데이터를 준비하지 못해 화면용 샘플을 표시합니다.");
+    } finally {
+      setDemoLoading(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
       <AppSidebar projectId={projectId} pendingCount={8} />
@@ -345,6 +366,10 @@ export default function CurrentWbsPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={startDemo} disabled={demoLoading}>
+                <Play className="mr-1.5 h-3.5 w-3.5" />
+                {demoLoading ? "샘플 준비 중..." : "샘플 데이터로 시작하기"}
+              </Button>
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadCsv} disabled={!projectId}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download CSV
