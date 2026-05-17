@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Update Review · WBS Keeper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Pretendard:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles/app-v2.css" />
+</head>
+<body>
+
+<!-- SVG icon defs (lucide-style 1.5 stroke) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2a1.5 1.5 0 0 1 1.06.44L11.5 7H19.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z"/></symbol>
+    <symbol id="i-tree" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v6M5 14v6M5 10h8M5 18h8"/><circle cx="5" cy="4" r="1.4"/><circle cx="5" cy="20" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="13" cy="18" r="1.4"/><circle cx="19" cy="10" r="1.4"/><path d="M15 10h2.5"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-check-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12.5l3 3 5-6"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.65 1.65 0 0 0-1.8-.3 1.65 1.65 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.65 1.65 0 0 0-1-1.5 1.65 1.65 0 0 0-1.8.3l-.1.1A2 2 0 0 1 4.2 16.9l.1-.1a1.65 1.65 0 0 0 .3-1.8 1.65 1.65 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.65 1.65 0 0 0 1.5-1 1.65 1.65 0 0 0-.3-1.8l-.1-.1A2 2 0 0 1 7 4.2l.1.1a1.65 1.65 0 0 0 1.8.3h.1a1.65 1.65 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.65 1.65 0 0 0 1 1.5h.1a1.65 1.65 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.65 1.65 0 0 0-.3 1.8v.1a1.65 1.65 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.65 1.65 0 0 0-1.5 1Z"/></symbol>
+    <symbol id="i-chevrons-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 5 5 5-5M7 14l5 5 5-5"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><circle cx="12" cy="17.5" r="0.7" fill="currentColor"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r="0.7" fill="currentColor"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
+    <symbol id="i-shield-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/><path d="M12 9v4"/><circle cx="12" cy="16" r="0.7" fill="currentColor"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h4v4H8c-1 2-2 3-3 3v3c3 0 6-3 6-7V7H7Zm9 0h4v4h-3c-1 2-2 3-3 3v3c3 0 6-3 6-7V7h-4Z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 13.5 8.5 19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5Z"/><path d="M19 16v3M17.5 17.5h3"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 8v6l-4-2v-4L4 5Z"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7"/><circle cx="12" cy="17" r="0.7" fill="currentColor"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></symbol>
+    <symbol id="i-trend-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17 9 11l4 4 8-8"/><path d="M14 7h7v7"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16v-5a6 6 0 0 0-12 0v5l-2 3h16l-2-3Z"/><path d="M10 21a2 2 0 0 0 4 0"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">W</div>
+      <div class="brand-name">WBS Keeper<em></em></div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section-label">Workspace</div>
+      <a class="nav-item">
+        <svg class="ico"><use href="#i-dashboard"/></svg>
+        Dashboard
+      </a>
+      <a class="nav-item">
+        <svg class="ico"><use href="#i-folder"/></svg>
+        Projects
+      </a>
+      <a class="nav-item">
+        <svg class="ico"><use href="#i-tree"/></svg>
+        WBS
+      </a>
+      <a class="nav-item">
+        <svg class="ico"><use href="#i-mic"/></svg>
+        Meetings
+      </a>
+
+      <div class="nav-section-label" style="margin-top:14px;">Review</div>
+      <a class="nav-item is-active">
+        <svg class="ico"><use href="#i-check-square"/></svg>
+        Update Review
+        <span class="count">8</span>
+      </a>
+      <a class="nav-item">
+        <svg class="ico"><use href="#i-history"/></svg>
+        Change History
+      </a>
+
+      <div class="nav-section-label" style="margin-top:14px;">Account</div>
+      <a class="nav-item">
+        <svg class="ico"><use href="#i-settings"/></svg>
+        Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="avatar">JK</div>
+        <div class="user-meta">
+          <span class="user-name">정 경민</span>
+          <span class="user-role">PM · AI UX Review</span>
+        </div>
+        <svg class="chev"><use href="#i-chevrons-down"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+
+    <!-- HEADER -->
+    <header class="header">
+      <div>
+        <div class="crumbs">
+          <span>Projects</span>
+          <span class="sep">/</span>
+          <span>AI UX Review Agent</span>
+          <span class="sep">/</span>
+          <span class="here">Update Review</span>
+        </div>
+        <h1 class="page-title">
+          Meeting-to-WBS Review
+          <span class="meeting-pill"><span class="dot"></span>Weekly Project Sync · 2026.05.17</span>
+        </h1>
+        <p class="page-sub">
+          AI가 회의록에서 감지한 WBS 변경 후보입니다. 검토 후 승인한 항목만 WBS에 반영됩니다.
+        </p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-default" type="button">
+          <svg class="ico"><use href="#i-history"/></svg>
+          이전 회의 보기
+        </button>
+        <button class="btn btn-default" type="button">
+          <svg class="ico"><use href="#i-download"/></svg>
+          Export
+        </button>
+        <button class="btn-apply" type="button">
+          <span class="count-chip tnum">5</span>
+          Apply to WBS
+          <span class="kbd">⌘↵</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- BODY -->
+    <div class="body">
+
+      <!-- SUMMARY STRIP -->
+      <section class="summary" aria-label="Change summary">
+        <div class="stat">
+          <div class="stat-top">
+            <svg class="ico"><use href="#i-sparkles"/></svg>
+            <span class="stat-label">Total changes</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-value">8</span>
+            <span class="stat-delta">5 selected</span>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-top">
+            <svg class="ico"><use href="#i-plus"/></svg>
+            <span class="stat-label">New tasks</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-value">2</span>
+            <span class="stat-delta">신규 작업</span>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-top">
+            <svg class="ico"><use href="#i-calendar"/></svg>
+            <span class="stat-label">Schedule changes</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-value">3</span>
+            <span class="stat-delta">일정 / 마감일</span>
+          </div>
+        </div>
+        <div class="stat is-attention">
+          <div class="stat-top">
+            <svg class="ico"><use href="#i-help"/></svg>
+            <span class="stat-label">Confirmation needed</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-value">2</span>
+            <span class="stat-delta">정보 누락</span>
+          </div>
+        </div>
+        <div class="stat is-risk">
+          <div class="stat-top">
+            <svg class="ico"><use href="#i-shield-alert"/></svg>
+            <span class="stat-label">Risks · 별도 저장</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-value">1</span>
+            <span class="stat-delta">Risk register</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- WORKSPACE -->
+      <section class="workspace">
+
+        <!-- ============ LEFT: MEETING NOTE ============ -->
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title-row">
+              <h2 class="panel-title">
+                <svg class="ico"><use href="#i-doc"/></svg>
+                Meeting Note
+              </h2>
+              <span style="font:500 11.5px/16px var(--font-sans); color:var(--fg-4); letter-spacing:-0.005em;">참석 6명 · 70분</span>
+            </div>
+            <div class="meeting-meta">
+              <span>Weekly Project Sync</span>
+              <span class="div"></span>
+              <span class="date">2026.05.17 (월) · 14:00 — 15:10</span>
+            </div>
+            <div class="meeting-tools">
+              <div class="input">
+                <svg class="ico"><use href="#i-search"/></svg>
+                <input type="text" placeholder="회의록에서 검색…" />
+              </div>
+              <button class="toggle on" type="button">
+                <span class="sw"></span>
+                Evidence only
+              </button>
+            </div>
+          </div>
+
+          <div class="meeting-body">
+            <div class="meeting-scroll">
+
+              <div class="agenda-h"><span class="ix">01</span><span>지난 액션 리뷰</span><span class="ln"></span></div>
+              <p class="note-p">
+                <span class="who">PM 경민</span>
+                지난주 액션 아이템 진행률은 70% 수준. 미완료 항목은 이번 주 내로 정리하기로 함.
+              </p>
+
+              <div class="agenda-h"><span class="ix">02</span><span>GUI 디자인 진행</span><span class="ln"></span></div>
+              <p class="note-p">
+                <span class="who">디자이너 수민</span>
+                초안 작업이 예상보다 길어지고 있어
+                <span class="ev"><span class="ev-num">1</span>GUI 초안은 다음 주 수요일까지 연장하기로 함</span>.
+                이번 주 금요일까지 디자인 시스템 정리도 함께 마무리 예정.
+              </p>
+
+              <div class="agenda-h"><span class="ix">03</span><span>개발 담당 재할당</span><span class="ln"></span></div>
+              <p class="note-p">
+                <span class="who">리드 도현</span>
+                기존에 개발팀 전체에 묶여 있던 작업을 분리할 필요가 있음.
+                <span class="ev"><span class="ev-num">2</span>개발 구현은 민수님이 담당하기로 함</span>.
+                QA는 별도 분리하지 않고 기존 체계 유지.
+              </p>
+
+              <div class="agenda-h"><span class="ix">04</span><span>법무 검토 필요성</span><span class="ln"></span></div>
+              <p class="note-p">
+                <span class="who">운영지원 하늘</span>
+                AI 응답을 외부에 노출하는 시나리오가 있어
+                <span class="ev"><span class="ev-num">3</span>법무 검토가 런칭 전 필요하다는 의견이 있었음</span>.
+                담당 부서와 일정은 별도 협의.
+              </p>
+
+              <div class="agenda-h"><span class="ix">05</span><span>외부 연동 범위</span><span class="ln"></span></div>
+              <p class="note-p">
+                <span class="who">PM 경민</span>
+                <span class="ev"><span class="ev-num">4</span>Jira 연동은 이번 1차 MVP 범위에서 제외하고 2차로 미룸</span>.
+                1차에서는 CSV 내보내기까지만 유지.
+              </p>
+
+              <div class="agenda-h"><span class="ix">06</span><span>기술 리스크</span><span class="ln"></span></div>
+              <p class="note-p">
+                <span class="who">엔지니어 지호</span>
+                AI 호출부 안정성과 관련해서
+                <span class="ev"><span class="ev-num">5</span>OpenAI API 응답이 JSON 형식으로 안정적으로 오지 않을 경우 앱 오류가 발생할 수 있음</span>.
+                파서 fallback 전략을 사전 정의 권장.
+              </p>
+
+              <div class="agenda-h"><span class="ix">07</span><span>다음 회의</span><span class="ln"></span></div>
+              <p class="note-p">
+                다음 주 동일 시간. 디자인·개발·QA 각 영역의 진행률을 표로 공유.
+              </p>
+
+              <div class="agenda-h"><span class="ix">08</span><span>기타</span><span class="ln"></span></div>
+              <p class="note-p">
+                휴가·외근으로 인한 일정 영향은 슬랙 채널 #wbs-keeper에 공유.
+              </p>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ RIGHT: CHANGE CANDIDATES ============ -->
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title-row">
+              <div>
+                <h2 class="panel-title">
+                  <svg class="ico"><use href="#i-sparkles"/></svg>
+                  AI-detected changes
+                </h2>
+                <p class="panel-sub" style="margin-top:4px;">검토 후 승인한 항목만 WBS에 반영됩니다. 모든 변경은 이력에 기록돼요.</p>
+              </div>
+              <div class="input compact" style="width:200px; flex:none;">
+                <svg class="ico"><use href="#i-search"/></svg>
+                <input type="text" placeholder="task · evidence 검색" />
+              </div>
+            </div>
+
+            <div class="cand-toolbar">
+              <div class="tabs" role="tablist">
+                <button class="tab is-active">All <span class="count">8</span></button>
+                <button class="tab">New <span class="count">2</span></button>
+                <button class="tab">Schedule <span class="count">3</span></button>
+                <button class="tab">Owner <span class="count">1</span></button>
+                <button class="tab">Status <span class="count">1</span></button>
+                <button class="tab">Risk <span class="count">1</span></button>
+              </div>
+              <div class="cand-tools-right">
+                <button class="conf-select" type="button">
+                  <svg class="ico"><use href="#i-filter"/></svg>
+                  Confidence <span class="v">High +</span>
+                  <svg class="ico"><use href="#i-chevron-down"/></svg>
+                </button>
+                <button class="btn btn-default btn-sm" type="button">
+                  Group by type
+                  <svg class="ico"><use href="#i-chevron-down"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="cand-body">
+
+            <!-- ============ Section: WBS changes ============ -->
+            <div class="cand-section">
+              <div class="cand-section-h">
+                <span class="label">WBS Changes</span>
+                <span class="desc">승인 시 WBS에 직접 반영됩니다</span>
+                <span class="meta tnum">4 / 7</span>
+              </div>
+
+              <div class="cand-list">
+
+                <!-- ====== Row 1 — Schedule ====== -->
+                <article class="cand is-selected">
+                  <div class="checkbox on">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                  </div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type schedule"><span class="dot"></span>Schedule</span>
+                      <span class="confidence high"><span class="dot"></span>High<span class="num">·92</span></span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">GUI 초안 생성</h3>
+                      <span class="cand-wbsid">WBS <b>1.3</b></span>
+                    </div>
+                    <div class="diff">
+                      <span class="field">Due</span>
+                      <span class="before tnum">2026-05-24</span>
+                      <svg class="arrow"><use href="#i-arrow-right"/></svg>
+                      <span class="after tnum">2026-05-27</span>
+                      <span style="color:var(--fg-4); font-weight:500;">· +3일</span>
+                    </div>
+                    <div class="evidence">
+                      <svg class="qmark"><use href="#i-quote"/></svg>
+                      <div><span class="ev-id">1</span><q>GUI 초안은 다음 주 수요일까지 연장하기로 함</q></div>
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+
+                <!-- ====== Row 2 — Owner ====== -->
+                <article class="cand is-selected">
+                  <div class="checkbox on">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                  </div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type owner"><span class="dot"></span>Owner</span>
+                      <span class="confidence high"><span class="dot"></span>High<span class="num">·96</span></span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">개발 구현</h3>
+                      <span class="cand-wbsid">WBS <b>1.4</b></span>
+                    </div>
+                    <div class="diff">
+                      <span class="field">Owner</span>
+                      <span class="before">개발팀</span>
+                      <svg class="arrow"><use href="#i-arrow-right"/></svg>
+                      <span class="after">민수</span>
+                    </div>
+                    <div class="evidence">
+                      <svg class="qmark"><use href="#i-quote"/></svg>
+                      <div><span class="ev-id">2</span><q>개발 구현은 민수님이 담당하기로 함</q></div>
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+
+                <!-- ====== Row 3 — Hold / Status ====== -->
+                <article class="cand is-selected">
+                  <div class="checkbox on">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                  </div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type hold"><span class="dot"></span>Hold / Drop</span>
+                      <span class="confidence high"><span class="dot"></span>High<span class="num">·89</span></span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">Jira 연동</h3>
+                      <span class="cand-wbsid">WBS <b>2.1</b></span>
+                    </div>
+                    <div class="diff">
+                      <span class="field">Status</span>
+                      <span class="before">예정 (1차)</span>
+                      <svg class="arrow"><use href="#i-arrow-right"/></svg>
+                      <span class="after">2차 범위로 이월</span>
+                    </div>
+                    <div class="evidence">
+                      <svg class="qmark"><use href="#i-quote"/></svg>
+                      <div><span class="ev-id">4</span><q>Jira 연동은 이번 1차 MVP 범위에서 제외하고 2차로 미룸</q></div>
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+
+                <!-- ====== Row 4 — New Task (Needs Confirmation) ====== -->
+                <article class="cand is-selected">
+                  <div class="checkbox on">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                  </div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type newtask"><span class="dot"></span>New Task</span>
+                      <span class="confidence med"><span class="dot"></span>Medium<span class="num">·71</span></span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">법무 검토</h3>
+                      <span class="cand-wbsid">WBS <b>New</b></span>
+                    </div>
+                    <div class="diff">
+                      <span class="field">New item</span>
+                      <span class="after">법무 검토 작업 추가</span>
+                      <span style="color:var(--fg-4); font-weight:500;">·</span>
+                      <span class="after is-missing">Owner 미정</span>
+                      <span style="color:var(--fg-4); font-weight:500;">·</span>
+                      <span class="after is-missing">Due 미정</span>
+                    </div>
+                    <div class="evidence">
+                      <svg class="qmark"><use href="#i-quote"/></svg>
+                      <div><span class="ev-id">3</span><q>법무 검토가 런칭 전 필요하다는 의견이 있었음</q></div>
+                    </div>
+                    <div class="needs-callout">
+                      <svg class="ico"><use href="#i-help"/></svg>
+                      <div><b>확인 필요</b> · 담당자와 마감일이 회의록에 명시되어 있지 않습니다. 적용 전 담당자를 지정해 주세요.</div>
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+
+                <!-- ====== Row 5 — Schedule (not selected) ====== -->
+                <article class="cand">
+                  <div class="checkbox"></div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type schedule"><span class="dot"></span>Schedule</span>
+                      <span class="confidence med"><span class="dot"></span>Medium<span class="num">·64</span></span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">디자인 시스템 정리</h3>
+                      <span class="cand-wbsid">WBS <b>1.3.2</b></span>
+                    </div>
+                    <div class="diff">
+                      <span class="field">Due</span>
+                      <span class="before tnum">2026-05-29</span>
+                      <svg class="arrow"><use href="#i-arrow-right"/></svg>
+                      <span class="after tnum">2026-05-22</span>
+                      <span style="color:var(--fg-4); font-weight:500;">· −7일</span>
+                    </div>
+                    <div class="reason">
+                      <span class="sp">AI</span>
+                      발화가 명시적 마감 변경이 아닐 수 있어 확인을 권장합니다.
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+
+                <!-- ====== Row 6 — New Task (Needs Confirmation, not selected) ====== -->
+                <article class="cand">
+                  <div class="checkbox"></div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type newtask"><span class="dot"></span>New Task</span>
+                      <span class="confidence med"><span class="dot"></span>Medium<span class="num">·58</span></span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">JSON 파서 fallback 전략 정의</h3>
+                      <span class="cand-wbsid">WBS <b>New</b></span>
+                    </div>
+                    <div class="evidence">
+                      <svg class="qmark"><use href="#i-quote"/></svg>
+                      <div><span class="ev-id">5</span><q>파서 fallback 전략을 사전에 정해두면 좋겠다는 의견이 있었습니다</q></div>
+                    </div>
+                    <div class="needs-callout">
+                      <svg class="ico"><use href="#i-help"/></svg>
+                      <div><b>확인 필요</b> · 부모 작업과 우선순위가 불명확합니다.</div>
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+
+                <!-- ====== Row 7 — Dependency (not selected) ====== -->
+                <article class="cand">
+                  <div class="checkbox"></div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type dep"><span class="dot"></span>Dependency</span>
+                      <span class="confidence high"><span class="dot"></span>High<span class="num">·84</span></span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">런칭 준비 → 법무 검토 선행</h3>
+                      <span class="cand-wbsid">WBS <b>3.0</b></span>
+                    </div>
+                    <div class="diff">
+                      <span class="field">Depends on</span>
+                      <span class="before">1.4 개발 구현</span>
+                      <svg class="arrow"><use href="#i-arrow-right"/></svg>
+                      <span class="after">1.4 개발 구현 + 법무 검토</span>
+                    </div>
+                    <div class="reason">
+                      <span class="sp">AI</span>
+                      법무 검토 신규 작업 추가 시 자동으로 선행 의존성으로 제안됩니다.
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+
+              </div>
+            </div>
+
+            <!-- ============ Section: Risks (separate, NOT applied to WBS) ============ -->
+            <div class="cand-section is-risk">
+              <div class="cand-section-h">
+                <span class="label">Risk Register</span>
+                <span class="desc">WBS에 반영되지 않고 Risk 항목으로 별도 저장됩니다</span>
+                <span class="meta tnum">1 / 1</span>
+              </div>
+
+              <div class="cand-list">
+                <article class="cand is-selected">
+                  <div class="checkbox on">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+                  </div>
+                  <div class="cand-main">
+                    <div class="cand-row1">
+                      <span class="badge b-type risk"><span class="dot"></span>Risk</span>
+                      <span class="confidence med"><span class="dot"></span>Medium<span class="num">·68</span></span>
+                      <span class="badge b-risk-only">Risk register only</span>
+                    </div>
+                    <div class="cand-title-row">
+                      <h3 class="cand-task">OpenAI JSON parsing instability</h3>
+                      <span class="cand-wbsid">→ Risk <b>R-04</b></span>
+                    </div>
+                    <div class="diff">
+                      <span class="field">Save as</span>
+                      <span class="after is-risk">Risk Register R-04 · Open</span>
+                    </div>
+                    <div class="evidence">
+                      <svg class="qmark"><use href="#i-quote"/></svg>
+                      <div><span class="ev-id">5</span><q>OpenAI API 응답이 JSON 형식으로 안정적으로 오지 않을 경우 앱 오류가 발생할 수 있음</q></div>
+                    </div>
+                    <div class="reason">
+                      <span class="sp">AI</span>
+                      WBS 작업이 아닌 리스크 항목으로 저장하는 것이 적절합니다. 적용 시 WBS는 변경되지 않습니다.
+                    </div>
+                  </div>
+                  <div class="cand-right">
+                    <svg class="cand-chevron"><use href="#i-chevron-right"/></svg>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ============ DRAWER (third column) ============ -->
+        <aside class="drawer" aria-label="Change detail">
+          <div class="drawer-head">
+            <div class="head-left">
+              <h3>Change Detail</h3>
+              <div class="crumb">CANDIDATE 1 / 8</div>
+            </div>
+            <div class="actions">
+              <button class="drawer-nav-btn" type="button" aria-label="Previous">
+                <svg class="ico" style="transform:rotate(180deg)"><use href="#i-chevron-right"/></svg>
+              </button>
+              <button class="drawer-nav-btn" type="button" aria-label="Next">
+                <svg class="ico"><use href="#i-chevron-right"/></svg>
+              </button>
+              <button class="drawer-nav-btn is-close" type="button" aria-label="Close">
+                <svg class="ico"><use href="#i-x"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="drawer-body">
+
+            <div>
+              <div class="drawer-badges">
+                <span class="badge b-type schedule"><span class="dot"></span>Schedule Change</span>
+                <span class="confidence high" style="padding:2px 0;"><span class="dot"></span>High<span class="num">·92</span></span>
+              </div>
+              <h2 class="drawer-task">GUI 초안 생성</h2>
+              <div class="drawer-wbsid">
+                <b>WBS 1.3</b>
+                <span class="sep">·</span>
+                Owner 수민
+                <span class="sep">·</span>
+                AI UX Review Agent
+              </div>
+            </div>
+
+            <div class="drawer-section">
+              <div class="lbl">Field change</div>
+              <div class="field-table">
+                <div class="field-row">
+                  <div class="k">Field</div>
+                  <div class="v">Due date</div>
+                </div>
+                <div class="field-row">
+                  <div class="k">Current</div>
+                  <div class="v before">2026-05-24 (일)</div>
+                </div>
+                <div class="field-row">
+                  <div class="k">Proposed</div>
+                  <div class="v after">2026-05-27 (수) <span class="delta">+3일 연장</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="drawer-section">
+              <div class="lbl">Evidence</div>
+              <div class="drawer-evidence">
+                <div class="src">
+                  <svg class="ico"><use href="#i-quote"/></svg>
+                  Weekly Project Sync · 안건 02 · 14:18
+                </div>
+                <q>GUI 초안은 다음 주 수요일까지 연장하기로 함</q>
+                <div class="meta">— 디자이너 수민</div>
+                <button class="jump" type="button">
+                  회의록에서 보기
+                  <svg class="ico"><use href="#i-arrow-right"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="drawer-section">
+              <div class="lbl">AI Reasoning</div>
+              <div class="drawer-reason">
+                <div class="lbl2">
+                  <svg class="ico"><use href="#i-sparkles"/></svg>
+                  판단 근거
+                </div>
+                <p>
+                  기존 WBS의 “GUI 초안 생성” 작업과 유사도 0.94로 매칭되었으며,
+                  “다음 주 수요일” 표현은 회의일(2026.05.17) 기준 2026-05-27로 해석됩니다.
+                  마감일 외 다른 속성 변경은 감지되지 않았습니다.
+                </p>
+              </div>
+            </div>
+
+            <div class="drawer-section">
+              <div class="lbl">Impact on dependent tasks</div>
+              <div class="impact-list">
+                <div class="impact-item">
+                  <svg class="ico"><use href="#i-link"/></svg>
+                  <div>
+                    <span class="nm">개발 구현</span>
+                    <span class="id">WBS 1.4</span>
+                  </div>
+                  <span class="tag warn">시작일 +3일</span>
+                </div>
+                <div class="impact-item">
+                  <svg class="ico"><use href="#i-link"/></svg>
+                  <div>
+                    <span class="nm">QA 1차</span>
+                    <span class="id">WBS 1.5</span>
+                  </div>
+                  <span class="tag none">영향 없음</span>
+                </div>
+                <div class="impact-item">
+                  <svg class="ico"><use href="#i-link"/></svg>
+                  <div>
+                    <span class="nm">런칭 준비</span>
+                    <span class="id">WBS 3.0</span>
+                  </div>
+                  <span class="tag warn">마일스톤 검토</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="decision">
+            <button class="btn-approve" type="button">
+              <svg class="ico"><use href="#i-check"/></svg>
+              Approve
+            </button>
+            <button class="btn-reject" type="button">
+              <svg class="ico" style="width:12px;height:12px"><use href="#i-x"/></svg>
+              Reject
+            </button>
+            <button class="btn-clarify full" type="button">
+              <svg class="ico"><use href="#i-help"/></svg>
+              Mark as needs clarification
+            </button>
+          </div>
+        </aside>
+
+      </section>
+    </div>
+
+    <!-- STICKY ACTION BAR -->
+    <div class="actionbar">
+      <div class="actionbar-left">
+        <div class="checkbox indet" style="margin-right:4px;">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M6 12h12"/></svg>
+        </div>
+        <div class="selected-info">
+          <span class="num">5</span><span class="of">of 8 changes selected</span>
+        </div>
+        <div class="divider-v"></div>
+        <div class="selection-actions">
+          <button class="text-link" type="button">전체 선택</button>
+          <button class="text-link" type="button">High만</button>
+          <button class="text-link" type="button">선택 해제</button>
+        </div>
+      </div>
+
+      <div class="actionbar-note">
+        <svg class="ico"><use href="#i-info"/></svg>
+        승인된 항목만 WBS에 반영되며, 모든 결정은 Change History에 기록됩니다.
+      </div>
+
+      <div class="actionbar-right">
+        <button class="btn btn-default" type="button">
+          <svg class="ico"><use href="#i-help"/></svg>
+          Mark as clarification
+        </button>
+        <button class="btn btn-danger-ghost" type="button">
+          Reject selected
+        </button>
+        <button class="btn-apply" type="button">
+          <span class="count-chip tnum">5</span>
+          Apply to WBS
+          <span class="kbd">⌘↵</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,11 @@
+Meeting date: 2026-05-17
+Meeting title: WBS Agent MVP weekly sync
+
+API contract freeze is done.
+WBS upload module owner is Minsoo Kim.
+Meeting analyzer due date changed to 2026-05-24 because prompt validation needs one more pass.
+Review workflow depends on Meeting analyzer completion.
+Change applier is moved to phase 2 if SQLite migration is not stable by Friday.
+New task: Add stakeholder demo checklist.
+CSV export format will be decided in the next meeting.
+Risk: QA regression may be delayed if the download CSV encoding issue remains open.

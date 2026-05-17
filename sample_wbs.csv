@@ -1,0 +1,11 @@
+Task ID,Task Name,Description,Owner,Start Date,Due Date,Status,Dependency,Notes
+WBS-001,Discovery workshop,Align scope and success criteria with product and PMO,Kim,2026-05-13,2026-05-15,Done,,Stakeholder interviews completed
+WBS-002,API contract freeze,Finalize backend/frontend API request and response contracts,Lee,2026-05-15,2026-05-17,In Progress,WBS-001,Review-first update flow
+WBS-003,WBS upload module,Parse CSV/XLSX and normalize rows into project WBS table,Park,2026-05-16,2026-05-20,In Progress,WBS-002,Includes column mapping
+WBS-004,Meeting analyzer,Extract WBS changes risks and clarification items from meeting notes,Choi,2026-05-17,2026-05-22,Pending,WBS-002,Mock mode must work without OpenAI key
+WBS-005,Review workflow,Show evidence before/after confidence and confirmation flags,Han,2026-05-20,2026-05-24,Pending,WBS-004,No automatic apply
+WBS-006,Change applier,Apply only selected changes and write history records,Lee,2026-05-22,2026-05-27,Pending,WBS-005,Handle new_task schedule owner status dependency risk
+WBS-007,CSV export,Download latest WBS after approved changes,Park,2026-05-24,2026-05-28,Pending,WBS-006,UTF-8 CSV
+WBS-008,QA regression,Test upload analyze review apply history download flow,Seo,2026-05-27,2026-05-31,Pending,WBS-007,Use demo scenario
+WBS-009,Stakeholder demo,Prepare 3-minute demo and sample data,Yoon,2026-05-29,2026-06-02,Pending,WBS-008,Needs product owner review
+WBS-010,MVP handoff,Document setup test commands and known mock behavior,Kim,2026-06-01,2026-06-04,Pending,WBS-009,README update

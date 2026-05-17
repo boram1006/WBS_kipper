@@ -1,0 +1,12 @@
+node_modules/
+.npm-cache/
+.next/
+.next_broken/
+.venv/
+__pycache__/
+*.pyc
+*.db
+.env
+*.tsbuildinfo
+
+.vercel

@@ -1,0 +1,54 @@
+/* LGE AX Hackathon 2026 — color tokens */
+:root {
+  /* Brand primary — used for CTAs, eyebrows, brand accents */
+  --color-primary:        #FD312E;   /* red */
+  --color-primary-hover:  #E04137;   /* slightly deeper for hover */
+  --color-primary-active: #C8342B;
+  --color-primary-light:  #FFE0E0;   /* pill background */
+  --color-primary-bg:     #FFF0F0;   /* tint surface */
+  --color-primary-border: #FFE0E0;
+
+  /* Accents — sparingly */
+  --color-accent-indigo:  #6366F1;
+  --color-accent-yellow:  #FFCC00;
+
+  /* Semantic */
+  --color-danger:         #EF4444;
+  --color-success:        #10B981;
+  --color-warning:        #F59E0B;
+  --color-info:           #3B82F6;
+
+  /* Surfaces */
+  --color-surface:        #FFFFFF;   /* card */
+  --color-canvas:         #F7F8F9;   /* body */
+  --color-ink:            #111827;   /* navy hero / footer */
+  --color-ink-2:          #1F2937;   /* raised on ink */
+  --color-ink-3:          #374151;   /* border on ink */
+
+  /* Neutrals */
+  --color-neutral-10:     #F9FAFB;
+  --color-neutral-30:     #F3F4F6;
+  --color-neutral-100:    #E5E7EB;
+  --color-neutral-200:    #D1D5DB;
+  --color-neutral-300:    #9CA3AF;
+  --color-neutral-500:    #6B7280;
+  --color-neutral-600:    #4B5563;
+  --color-neutral-700:    #374151;
+  --color-neutral-800:    #1F2937;
+  --color-neutral-900:    #111111;
+  --color-neutral-black:  #000000;
+
+  /* Text roles */
+  --text-primary:         var(--color-neutral-900);
+  --text-secondary:       var(--color-neutral-500);
+  --text-tertiary:        var(--color-neutral-300);
+  --text-on-dark:         #FFFFFF;
+  --text-on-dark-dim:     #9CA3AF;
+  --text-brand:           var(--color-primary);
+
+  /* Border roles */
+  --border-subtle:        var(--color-neutral-100);
+  --border-default:       var(--color-neutral-200);
+  --border-strong:        var(--color-neutral-300);
+  --border-on-ink:        var(--color-ink-3);
+}
