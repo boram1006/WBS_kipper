@@ -50,77 +50,6 @@ type HistoryRow = {
   reason: string;
 };
 
-const MOCK_HISTORY: HistoryRow[] = [
-  {
-    id: "hist-1",
-    changedAt: "2026-05-17 14:30",
-    changeType: "schedule_change",
-    wbsId: "1.3",
-    taskName: "GUI 초안 생성",
-    field: "due_date",
-    before: "2026-05-24",
-    after: "2026-05-27",
-    evidence: "GUI 초안은 다음 주 수요일까지 연장하기로 함",
-    confidence: "high",
-    requiresConfirmation: false,
-    sourceMeeting: "Weekly Project Sync",
-    meetingDate: "2026-05-17",
-    appliedBy: "local_user",
-    reason: "Existing WBS task matched and the new due date was clearly mentioned."
-  },
-  {
-    id: "hist-2",
-    changedAt: "2026-05-17 14:32",
-    changeType: "owner_change",
-    wbsId: "1.4",
-    taskName: "개발 구현",
-    field: "owner",
-    before: "개발팀",
-    after: "민수",
-    evidence: "개발 구현은 민수님이 담당하기로 함",
-    confidence: "high",
-    requiresConfirmation: false,
-    sourceMeeting: "Weekly Project Sync",
-    meetingDate: "2026-05-17",
-    appliedBy: "local_user",
-    reason: "The assignee was explicitly stated in the meeting note."
-  },
-  {
-    id: "hist-3",
-    changedAt: "2026-05-17 14:35",
-    changeType: "new_task",
-    wbsId: "1.6",
-    taskName: "법무 검토",
-    field: "task",
-    before: "-",
-    after: "신규 작업 추가",
-    evidence: "법무 검토가 런칭 전 필요하다는 의견이 있었음",
-    confidence: "medium",
-    requiresConfirmation: true,
-    sourceMeeting: "Weekly Project Sync",
-    meetingDate: "2026-05-17",
-    appliedBy: "local_user",
-    reason: "New task detected, but owner and due date are missing."
-  },
-  {
-    id: "hist-4",
-    changedAt: "2026-05-17 14:38",
-    changeType: "status_change",
-    wbsId: "2.1",
-    taskName: "Jira 연동",
-    field: "status",
-    before: "예정",
-    after: "보류",
-    evidence: "Jira 연동은 이번 1차 MVP 범위에서 제외하고 2차로 미룸",
-    confidence: "high",
-    requiresConfirmation: false,
-    sourceMeeting: "Weekly Project Sync",
-    meetingDate: "2026-05-17",
-    appliedBy: "local_user",
-    reason: "The note clearly states this item is excluded from the first MVP and moved to phase 2."
-  }
-];
-
 const changeTypes = [
   "all",
   "new_task",
@@ -160,7 +89,6 @@ export default function HistoryPage() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [usingMock, setUsingMock] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [dateRange, setDateRange] = useState("all");
@@ -178,21 +106,13 @@ export default function HistoryPage() {
         const response = await api.getHistory(projectId);
         const normalized = response.history.map(normalizeHistory);
         if (!alive) return;
-        if (normalized.length === 0) {
-          setRows(MOCK_HISTORY);
-          setActiveId(MOCK_HISTORY[0]?.id ?? null);
-          setUsingMock(true);
-        } else {
-          setRows(normalized);
-          setActiveId(normalized[0]?.id ?? null);
-          setUsingMock(false);
-        }
+        setRows(normalized);
+        setActiveId(normalized[0]?.id ?? null);
       } catch (err) {
         if (!alive) return;
-        setRows(MOCK_HISTORY);
-        setActiveId(MOCK_HISTORY[0]?.id ?? null);
-        setUsingMock(true);
-        setError(err instanceof Error ? err.message : "변경 이력을 불러오지 못해 샘플 이력을 표시합니다.");
+        setRows([]);
+        setActiveId(null);
+        setError(err instanceof Error ? err.message : "변경 이력을 불러오지 못했습니다.");
       } finally {
         if (alive) setLoading(false);
       }
@@ -306,10 +226,10 @@ export default function HistoryPage() {
           ) : (
             <div className="grid grid-cols-[minmax(820px,1fr)_360px] gap-4">
               <div className="min-w-0 space-y-4">
-                {error && usingMock && (
+                {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-800">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>API 연결 실패 또는 빈 이력으로 샘플 변경 이력을 표시하고 있습니다.</span>
+                    <span>{error}</span>
                   </div>
                 )}
 

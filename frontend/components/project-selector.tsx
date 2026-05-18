@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,20 +11,32 @@ type Props = {
   projectId: string;
   onChange: (projectId: string) => void;
   allowCreate?: boolean;
+  preferDefaultProject?: boolean;
 };
 
-export function ProjectSelector({ projectId, onChange, allowCreate = true }: Props) {
+export function ProjectSelector({ projectId, onChange, allowCreate = true, preferDefaultProject = false }: Props) {
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(false);
+  const defaultApplied = useRef(false);
 
   useEffect(() => {
     let alive = true;
     async function loadProjects() {
       try {
         const response = await api.getProjects();
-        if (alive) setProjects(response.projects);
+        if (alive) {
+          setProjects(response.projects);
+          const selectedExists = response.projects.some((project) => String(project.id) === projectId);
+          const hasSavedProject = window.localStorage.getItem("wbs_keeper_active_project_id");
+          const defaultProject = response.projects.find((project) => project.name === "webOS UX") ?? response.projects[0];
+          const shouldPreferDefault = preferDefaultProject && !defaultApplied.current && defaultProject && String(defaultProject.id) !== projectId;
+          if (defaultProject && (shouldPreferDefault || !selectedExists || !hasSavedProject)) {
+            defaultApplied.current = true;
+            onChange(String(defaultProject.id));
+          }
+        }
       } catch {
         if (alive) setProjects([]);
       }
@@ -33,7 +45,7 @@ export function ProjectSelector({ projectId, onChange, allowCreate = true }: Pro
     return () => {
       alive = false;
     };
-  }, [projectId]);
+  }, [preferDefaultProject, projectId]);
 
   async function createProject() {
     const name = newName.trim();

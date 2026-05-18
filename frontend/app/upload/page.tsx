@@ -235,6 +235,7 @@ export default function WbsSetupPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
+  const [isCreatingNewWbs, setIsCreatingNewWbs] = useState(false);
 
   const validation = useMemo(() => validationFor(rows, uploadedColumns), [rows, uploadedColumns]);
   const badge = statusBadge(validation.status);
@@ -255,11 +256,13 @@ export default function WbsSetupPage() {
           setRows(editableRowsFromRaw(snapshot.rows_preview));
           setUploadedColumns([...STANDARD_COLUMN_KEYS]);
           setFileName("Saved WBS");
+          setIsCreatingNewWbs(false);
           saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
         } else {
           setRows([]);
           setUploadedColumns([]);
           setFileName(null);
+          setIsCreatingNewWbs(true);
         }
       } catch {
         if (!alive) return;
@@ -268,7 +271,13 @@ export default function WbsSetupPage() {
           setRows(editableRowsFromRaw(cached.rows_preview));
           setUploadedColumns([...STANDARD_COLUMN_KEYS]);
           setFileName("Saved WBS");
+          setIsCreatingNewWbs(false);
           setMessage("서버 WBS를 바로 불러오지 못해 브라우저에 저장된 WBS를 표시했습니다.");
+        } else {
+          setRows([]);
+          setUploadedColumns([]);
+          setFileName(null);
+          setIsCreatingNewWbs(true);
         }
       } finally {
         if (alive) setLoadingExisting(false);
@@ -295,6 +304,7 @@ export default function WbsSetupPage() {
     setUploadedColumns([...STANDARD_COLUMN_KEYS]);
     setFileName("샘플 WBS");
     setError(null);
+    setIsCreatingNewWbs(false);
     setMessage("샘플 WBS가 편집 테이블에 채워졌습니다. 저장하기 전에 행을 수정할 수 있습니다.");
   }
 
@@ -303,6 +313,7 @@ export default function WbsSetupPage() {
     setUploadedColumns([]);
     setFileName(null);
     setError(null);
+    setIsCreatingNewWbs(true);
     setMessage("새 WBS를 처음부터 작성할 수 있습니다. 저장 전까지 서버 데이터는 바뀌지 않습니다.");
   }
 
@@ -323,6 +334,7 @@ export default function WbsSetupPage() {
       const result = normalizeUploadedRows(await selectedFile.text());
       setUploadedColumns(result.columns);
       setRows(result.rows);
+      setIsCreatingNewWbs(false);
       const resultValidation = validationFor(result.rows, result.columns);
       if (resultValidation.missingRequiredColumns.length > 0) {
         setError(`필수 컬럼이 누락되었습니다: ${resultValidation.missingRequiredColumns.join(", ")}`);
@@ -392,6 +404,7 @@ export default function WbsSetupPage() {
       }
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
+      setIsCreatingNewWbs(false);
       setMessage("WBS가 저장되었습니다.");
       router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {
@@ -425,14 +438,6 @@ export default function WbsSetupPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ProjectSelector projectId={projectId} onChange={setProjectId} />
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadTemplate}>
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-                템플릿 다운로드
-              </Button>
-              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={loadSample}>
-                <Play className="mr-1.5 h-3.5 w-3.5" />
-                샘플 WBS 사용
-              </Button>
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={clearWbs}>
                 새 WBS
               </Button>
@@ -461,7 +466,8 @@ export default function WbsSetupPage() {
 
           <StandardInfoCard />
 
-          <section className="mt-5 grid gap-4 lg:grid-cols-3">
+          {isCreatingNewWbs && (
+            <section className="mt-5 grid gap-4 lg:grid-cols-3">
             <StartOption
               icon={Sparkles}
               title="샘플 WBS 사용"
@@ -509,7 +515,8 @@ export default function WbsSetupPage() {
                 </div>
               }
             />
-          </section>
+            </section>
+          )}
 
           <EditableWbsTable
             rows={rows}

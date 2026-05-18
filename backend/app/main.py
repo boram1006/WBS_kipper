@@ -25,6 +25,7 @@ from .services.update_applier import apply_approved_changes
 from .services.wbs import parse_wbs, rows_to_csv
 
 app = FastAPI(title="WBS Update Agent MVP")
+DEFAULT_PROJECT_NAME = "webOS UX"
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,6 +40,8 @@ app.add_middleware(
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    with get_conn() as conn:
+        _ensure_default_project(conn)
 
 
 @app.get("/health")
@@ -60,6 +63,7 @@ def create_project(payload: ProjectCreateRequest) -> dict:
 @app.get("/api/projects")
 def list_projects() -> dict:
     with get_conn() as conn:
+        _ensure_default_project(conn)
         rows = conn.execute("SELECT * FROM projects ORDER BY id DESC").fetchall()
         return {"projects": [dict(row) for row in rows]}
 
@@ -278,6 +282,15 @@ def download_latest_wbs(project_id: int) -> Response:
 def _ensure_project(conn, project_id: int) -> None:
     if not conn.execute("SELECT id FROM projects WHERE id = ?", (project_id,)).fetchone():
         raise HTTPException(status_code=404, detail="Project not found")
+
+
+def _ensure_default_project(conn) -> None:
+    if conn.execute("SELECT id FROM projects WHERE name = ?", (DEFAULT_PROJECT_NAME,)).fetchone():
+        return
+    conn.execute(
+        "INSERT INTO projects (name, description) VALUES (?, ?)",
+        (DEFAULT_PROJECT_NAME, "Default WBS project."),
+    )
 
 
 def _insert_wbs_row(conn, project_id: int, row: dict[str, str], raw: dict[str, str]) -> None:

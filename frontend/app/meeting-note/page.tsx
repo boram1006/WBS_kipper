@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { ProjectSelector } from "@/components/project-selector";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -51,7 +50,6 @@ const schema = z.object({
   meeting_date: z.string().min(1, "회의 날짜를 입력해 주세요."),
   meeting_title: z.string().min(1, "회의 제목을 입력해 주세요."),
   attendees: z.string().optional(),
-  wbs_version: z.string().min(1, "관련 WBS를 선택해 주세요."),
   meeting_note: z.string().min(10, "회의록을 10자 이상 입력해 주세요.")
 });
 
@@ -99,7 +97,6 @@ export default function MeetingNotePage() {
       meeting_date: new Date().toISOString().slice(0, 10),
       meeting_title: "",
       attendees: "",
-      wbs_version: "current",
       meeting_note: ""
     }
   });
@@ -107,7 +104,6 @@ export default function MeetingNotePage() {
   const note = form.watch("meeting_note");
   const meetingDate = form.watch("meeting_date");
   const meetingTitle = form.watch("meeting_title");
-  const wbsVersion = form.watch("wbs_version");
   const attendees = form.watch("attendees");
 
   const noteStats = useMemo(() => {
@@ -126,13 +122,13 @@ export default function MeetingNotePage() {
   const selectedCandidates = pendingCandidates.filter((candidate) => selected.has(candidate.id));
 
   const readiness = [
-    { label: "등록된 WBS 선택", ready: Boolean(projectId && wbsVersion), detail: wbsVersion === "current" ? "현재 등록된 WBS" : wbsVersion },
+    { label: "프로젝트 선택", ready: Boolean(projectId), detail: projectId ? `Project #${projectId}` : "-" },
     { label: "회의 날짜 선택", ready: Boolean(meetingDate), detail: meetingDate || "-" },
     { label: "회의 제목 입력", ready: Boolean(meetingTitle.trim()), detail: meetingTitle.trim() || "-" },
     { label: "회의록 입력", ready: noteStats.chars >= 10, detail: `${noteStats.chars}자` }
   ];
   const readyCount = readiness.filter((item) => item.ready).length;
-  const canAnalyze = Boolean(projectId && meetingDate && meetingTitle.trim() && wbsVersion && noteStats.chars >= 10);
+  const canAnalyze = Boolean(projectId && meetingDate && meetingTitle.trim() && noteStats.chars >= 10);
 
   function loadSample() {
     form.setValue("meeting_note", SAMPLE_NOTE, { shouldDirty: true, shouldValidate: true });
@@ -258,16 +254,6 @@ export default function MeetingNotePage() {
                 step="1"
                 title="회의 정보"
                 description="분석 결과와 변경 이력에 연결할 회의 기본 정보를 입력하세요."
-                action={
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="rounded-md text-[11px]">
-                      프로젝트 <b className="ml-1 font-semibold text-zinc-950">#{projectId}</b>
-                    </Badge>
-                    <Badge variant="outline" className="rounded-md text-[11px]">
-                      WBS <b className="ml-1 font-semibold text-zinc-950">현재 등록된 WBS</b>
-                    </Badge>
-                  </div>
-                }
               >
                 <div className="grid gap-3 p-4 pb-0 md:grid-cols-[1fr_180px]">
                   <Field label="회의 제목" required error={form.formState.errors.meeting_title?.message}>
@@ -277,17 +263,9 @@ export default function MeetingNotePage() {
                     <Input className="h-9 rounded-lg border-zinc-200 text-[12.5px]" type="date" {...form.register("meeting_date")} />
                   </Field>
                 </div>
-                <div className="grid gap-3 p-4 pt-3 md:grid-cols-[1fr_240px]">
+                <div className="grid gap-3 p-4 pt-3 md:grid-cols-1">
                   <Field label="참석자">
                     <Input className="h-9 rounded-lg border-zinc-200 text-[12.5px]" {...form.register("attendees")} />
-                  </Field>
-                  <Field label="관련 WBS" required error={form.formState.errors.wbs_version?.message}>
-                    <select
-                      className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[12.5px] text-zinc-800 outline-none focus:ring-2 focus:ring-zinc-950/10"
-                      {...form.register("wbs_version")}
-                    >
-                      <option value="current">현재 등록된 WBS</option>
-                    </select>
                   </Field>
                 </div>
                 {attendees && (

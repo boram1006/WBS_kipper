@@ -14,7 +14,7 @@ import {
   GitBranch,
   History,
   Info,
-  Play,
+
   Search,
   Sparkles,
   Table2,
@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { setActiveProjectId, useActiveProjectId } from "@/lib/use-project-id";
+import { useActiveProjectId } from "@/lib/use-project-id";
 import { loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
@@ -54,104 +54,6 @@ type WbsRow = {
 };
 
 type WbsBadge = "recent" | "new" | "schedule" | "owner" | "status" | "confirm";
-
-const MOCK_ROWS: WbsRow[] = [
-  {
-    wbsId: "1.1",
-    taskName: "요구사항 정의",
-    description: "서비스 범위와 핵심 사용자 요구사항을 정리합니다.",
-    owner: "김민수",
-    startDate: "2026-04-01",
-    dueDate: "2026-04-15",
-    status: "완료",
-    dependency: "-",
-    lastUpdated: "2026-05-10",
-    sourceMeeting: "Kickoff Meeting",
-    badges: [],
-    latestUpdate: "초기 요구사항 정리 완료",
-    before: "-",
-    after: "완료",
-    evidence: "요구사항 정의는 완료된 것으로 공유되었습니다.",
-    relatedHistory: ["2026-05-10 상태 완료 처리"],
-    dependentTasks: ["사용자 인터뷰", "요구사항 문서화"]
-  },
-  {
-    wbsId: "1.3",
-    taskName: "GUI 초안 생성",
-    description: "핵심 화면의 GUI 초안과 디자인 시스템 기준을 작성합니다.",
-    owner: "디자인팀",
-    startDate: "2026-05-16",
-    dueDate: "2026-05-27",
-    status: "진행",
-    dependency: "1.2",
-    lastUpdated: "2026-05-17",
-    sourceMeeting: "Weekly Project Sync",
-    badges: ["recent", "schedule"],
-    latestUpdate: "마감일이 2026-05-24에서 2026-05-27로 변경되었습니다.",
-    before: "2026-05-24",
-    after: "2026-05-27",
-    evidence: "GUI 초안은 다음 주 수요일까지 연장하기로 함",
-    relatedHistory: ["2026-05-17 schedule_change due_date 2026-05-24 → 2026-05-27"],
-    dependentTasks: ["디자인 시스템 정리", "프론트엔드 화면 구현"]
-  },
-  {
-    wbsId: "1.4",
-    taskName: "개발 구현",
-    description: "FastAPI와 Next.js 화면을 연결하고 주요 사용자 흐름을 구현합니다.",
-    owner: "민수",
-    startDate: "2026-05-20",
-    dueDate: "2026-06-07",
-    status: "진행",
-    dependency: "1.3",
-    lastUpdated: "2026-05-17",
-    sourceMeeting: "Weekly Project Sync",
-    badges: ["recent", "owner"],
-    latestUpdate: "담당자가 개발팀에서 민수로 변경되었습니다.",
-    before: "개발팀",
-    after: "민수",
-    evidence: "개발 구현은 민수님이 담당하기로 함",
-    relatedHistory: ["2026-05-17 owner_change owner 개발팀 → 민수"],
-    dependentTasks: ["QA 점검", "배포 환경 설정"]
-  },
-  {
-    wbsId: "1.6",
-    taskName: "법무 검토",
-    description: "런칭 전 개인정보, 약관, 외부 API 사용 범위를 검토합니다.",
-    owner: "미정",
-    startDate: "미정",
-    dueDate: "미정",
-    status: "예정",
-    dependency: "1.5",
-    lastUpdated: "2026-05-17",
-    sourceMeeting: "Weekly Project Sync",
-    badges: ["recent", "new", "confirm"],
-    latestUpdate: "신규 작업 후보로 추가되었고 세부 일정 확인이 필요합니다.",
-    before: "-",
-    after: "법무 검토 신규 row",
-    evidence: "법무 검토가 런칭 전 필요하다는 의견이 있었음",
-    relatedHistory: ["2026-05-17 new_task 법무 검토 생성"],
-    dependentTasks: ["런칭 체크리스트"]
-  },
-  {
-    wbsId: "2.1",
-    taskName: "Jira 연동",
-    description: "Jira 이슈와 WBS row를 동기화하는 기능입니다.",
-    owner: "플랫폼팀",
-    startDate: "2026-06-01",
-    dueDate: "2026-06-21",
-    status: "보류",
-    dependency: "-",
-    lastUpdated: "2026-05-17",
-    sourceMeeting: "Weekly Project Sync",
-    badges: ["recent", "status"],
-    latestUpdate: "1차 MVP 범위에서 제외되어 보류 상태로 변경되었습니다.",
-    before: "예정",
-    after: "보류",
-    evidence: "Jira 연동은 이번 1차 MVP 범위에서 제외하고 2차로 미룸",
-    relatedHistory: ["2026-05-17 hold_or_drop status 예정 → 보류"],
-    dependentTasks: ["Jira API 인증", "이슈 동기화"]
-  }
-];
 
 const badgeConfig: Record<WbsBadge, { label: string; className: string }> = {
   recent: { label: "Recently updated", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
@@ -281,9 +183,8 @@ export default function CurrentWbsPage() {
   const [rows, setRows] = useState<WbsRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dataSource, setDataSource] = useState<"api" | "cache" | "mock">("mock");
+  const [dataSource, setDataSource] = useState<"api" | "cache">("api");
   const [error, setError] = useState<string | null>(null);
-  const [demoLoading, setDemoLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -301,7 +202,7 @@ export default function CurrentWbsPage() {
         const parsed = normalizeRawRows(snapshot.rows_preview);
         if (!alive) return;
         setRows(parsed);
-        setActiveId(parsed[0]?.wbsId ?? null);
+        setActiveId(null);
         setDataSource("api");
         saveWbsSnapshot(projectId, snapshot);
       } catch (err) {
@@ -310,7 +211,7 @@ export default function CurrentWbsPage() {
         if (cached?.rows_preview?.length) {
           const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping);
           setRows(cachedRows);
-          setActiveId(cachedRows[0]?.wbsId ?? null);
+          setActiveId(null);
           setDataSource("cache");
           setError("서버에서 최신 WBS를 불러오지 못해 이 브라우저에 저장된 WBS를 표시합니다.");
         } else {
@@ -363,27 +264,6 @@ export default function CurrentWbsPage() {
     window.location.href = api.downloadWbsUrl(projectId);
   }
 
-  async function startDemo() {
-    setDemoLoading(true);
-    setError(null);
-    try {
-      const demo = await api.startDemo();
-      setActiveProjectId(demo.project.id);
-      saveWbsSnapshot(demo.project.id, demo.wbs);
-      const demoRows = normalizeRawRows(demo.wbs.rows_preview);
-      setRows(demoRows.length ? demoRows : MOCK_ROWS);
-      setActiveId((demoRows[0] ?? MOCK_ROWS[0])?.wbsId ?? null);
-      setDataSource(demoRows.length ? "cache" : "mock");
-    } catch (err) {
-      setRows(MOCK_ROWS);
-      setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
-      setDataSource("mock");
-      setError(err instanceof Error ? err.message : "샘플 데이터를 준비하지 못해 화면용 샘플을 표시합니다.");
-    } finally {
-      setDemoLoading(false);
-    }
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
       <AppSidebar projectId={projectId} pendingCount={8} />
@@ -408,18 +288,10 @@ export default function CurrentWbsPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <ProjectSelector projectId={projectId} onChange={setProjectId} />
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={startDemo} disabled={demoLoading}>
-                <Play className="mr-1.5 h-3.5 w-3.5" />
-                {demoLoading ? "샘플 준비 중..." : "샘플 데이터로 시작하기"}
-              </Button>
+              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} preferDefaultProject />
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadCsv} disabled={!projectId}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download CSV
-              </Button>
-              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => router.push(routes.upload(projectId))}>
-                <GitBranch className="mr-1.5 h-3.5 w-3.5" />
-                WBS Setting
               </Button>
             </div>
           </div>
@@ -594,7 +466,7 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
                   </div>
                   <div className="relative h-8 rounded-lg bg-zinc-100">
                     <div
-                      className={cn("absolute top-1/2 h-3 -translate-y-1/2 rounded-full", row.status.includes("완료") ? "bg-emerald-500" : row.status.includes("보류") ? "bg-orange-400" : "bg-zinc-900")}
+                      className={cn("absolute top-1/2 h-3 -translate-y-1/2 rounded-full", ganttBarClass(row.status))}
                       style={{ left: `${left}%`, width: `${width}%` }}
                     />
                   </div>
@@ -743,11 +615,23 @@ function Td({ children, className }: { children: ReactNode; className?: string }
 }
 
 function statusClass(status: string) {
-  if (status === "완료") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (status === "진행") return "border-sky-200 bg-sky-50 text-sky-800";
-  if (status === "보류" || status === "제외") return "border-orange-200 bg-orange-50 text-orange-800";
-  if (status === "지연") return "border-rose-200 bg-rose-50 text-rose-800";
+  const bucket = statusBucket(status);
+  if (bucket === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (bucket === "progress") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (bucket === "delayed") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (status.includes("보류") || status.includes("제외") || status.toLowerCase().includes("hold")) return "border-orange-200 bg-orange-50 text-orange-800";
+  if (status.includes("예정") || status.toLowerCase().includes("planned")) return "border-violet-200 bg-violet-50 text-violet-800";
   return "border-zinc-200 bg-zinc-50 text-zinc-700";
+}
+
+function ganttBarClass(status: string) {
+  const bucket = statusBucket(status);
+  if (bucket === "completed") return "bg-emerald-500";
+  if (bucket === "progress") return "bg-sky-500";
+  if (bucket === "delayed") return "bg-rose-500";
+  if (status.includes("보류") || status.includes("제외") || status.toLowerCase().includes("hold")) return "bg-orange-400";
+  if (status.includes("예정") || status.toLowerCase().includes("planned")) return "bg-violet-500";
+  return "bg-zinc-900";
 }
 
 function LoadingState() {
