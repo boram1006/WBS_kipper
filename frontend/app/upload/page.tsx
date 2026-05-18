@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { setActiveProjectId, useProjectIdFromQuery } from "@/lib/use-project-id";
+import { saveWbsSnapshot } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type StandardColumn = {
@@ -126,8 +127,9 @@ function csvFileFromRows(rows: WbsEditableRow[]) {
 }
 
 async function uploadAndMapStandardWbs(projectId: string, file: File) {
-  await api.uploadWbs(projectId, file);
+  const snapshot = await api.uploadWbs(projectId, file);
   await api.mapWbsColumns(projectId, STANDARD_MAPPING);
+  return snapshot;
 }
 
 function parseCsv(text: string): string[][] {
@@ -318,9 +320,10 @@ export default function WbsSetupPage() {
     setMessage(null);
     try {
       let targetProjectId = projectId;
+      let snapshot;
       const file = csvFileFromRows(rows);
       try {
-        await uploadAndMapStandardWbs(targetProjectId, file);
+        snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
       } catch (err) {
         const detail = err instanceof Error ? err.message : "";
         if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
@@ -330,9 +333,10 @@ export default function WbsSetupPage() {
         });
         targetProjectId = String(project.id);
         setActiveProjectId(targetProjectId);
-        await uploadAndMapStandardWbs(targetProjectId, file);
+        snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
       }
       setActiveProjectId(targetProjectId);
+      if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
       setMessage("WBS가 저장되었습니다.");
       router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {
