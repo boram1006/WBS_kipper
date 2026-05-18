@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import re
-import sqlite3
 from typing import Any
 
 
 def apply_approved_changes(
-    conn: sqlite3.Connection,
+    conn: Any,
     project_id: int,
     change_ids: list[int],
     applied_by: str = "system",
@@ -64,7 +63,7 @@ def apply_approved_changes(
     return {"applied_count": applied_count, "updated_wbs_preview": _wbs_preview(conn, project_id)}
 
 
-def _create_new_task(conn: sqlite3.Connection, project_id: int, change) -> dict[str, str]:
+def _create_new_task(conn: Any, project_id: int, change) -> dict[str, str]:
     next_id = _next_wbs_id(conn, project_id)
     task_name = change["task_name"] or change["proposed_value"] or "New task"
     description = change["reason"] or change["evidence"]
@@ -80,7 +79,7 @@ def _create_new_task(conn: sqlite3.Connection, project_id: int, change) -> dict[
     return {"wbs_id": next_id, "task_name": task_name}
 
 
-def _save_risk(conn: sqlite3.Connection, project_id: int, change) -> None:
+def _save_risk(conn: Any, project_id: int, change) -> None:
     conn.execute(
         """
         INSERT INTO risks (
@@ -124,7 +123,7 @@ def _new_value_for_change(change) -> str | None:
     return change["proposed_value"]
 
 
-def _find_wbs_row(conn: sqlite3.Connection, project_id: int, wbs_id: str | None):
+def _find_wbs_row(conn: Any, project_id: int, wbs_id: str | None):
     if not wbs_id:
         return None
     return conn.execute(
@@ -133,7 +132,7 @@ def _find_wbs_row(conn: sqlite3.Connection, project_id: int, wbs_id: str | None)
     ).fetchone()
 
 
-def _next_wbs_id(conn: sqlite3.Connection, project_id: int) -> str:
+def _next_wbs_id(conn: Any, project_id: int) -> str:
     rows = conn.execute("SELECT wbs_id FROM wbs_rows WHERE project_id = ?", (project_id,)).fetchall()
     values = [row["wbs_id"] for row in rows]
     matches = [re.match(r"^(.*?)(\d+)$", value or "") for value in values]
@@ -146,7 +145,7 @@ def _next_wbs_id(conn: sqlite3.Connection, project_id: int) -> str:
 
 
 def _insert_history(
-    conn: sqlite3.Connection,
+    conn: Any,
     project_id: int,
     change,
     wbs_id: str | None,
@@ -178,14 +177,14 @@ def _insert_history(
     )
 
 
-def _mark_applied(conn: sqlite3.Connection, change_id: int) -> None:
+def _mark_applied(conn: Any, change_id: int) -> None:
     conn.execute(
         "UPDATE change_candidates SET status = 'applied', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (change_id,),
     )
 
 
-def _wbs_preview(conn: sqlite3.Connection, project_id: int) -> dict[str, Any]:
+def _wbs_preview(conn: Any, project_id: int) -> dict[str, Any]:
     rows = [
         dict(row)
         for row in conn.execute(
@@ -211,4 +210,3 @@ def _severity_from_confidence(confidence: str) -> str:
     if confidence == "medium":
         return "medium"
     return "low"
-

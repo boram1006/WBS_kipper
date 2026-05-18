@@ -13,7 +13,7 @@ services:
       - key: MOCK_ANALYSIS
         value: "true"
       - key: DATABASE_URL
-        value: sqlite:///./wbs_agent.db
+        sync: false
       - key: CORS_ORIGINS
         value: https://your-vercel-app.vercel.app,http://localhost:3000
       - key: OPENAI_API_KEY
