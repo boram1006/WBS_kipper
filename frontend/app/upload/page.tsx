@@ -277,7 +277,20 @@ export default function WbsSetupPage() {
 
   async function saveWbs(continueToMeeting = false) {
     if (!canSave) {
-      setError("WBS를 저장하기 전에 필수값이 빠진 행을 수정해 주세요.");
+      if (rows.length === 0) {
+        setError("저장할 WBS 행이 없습니다. 작업 추가를 누르거나 샘플 WBS를 불러와 주세요.");
+      } else {
+        const rowsWithMissing = validation.missingRequiredRows.join(", ");
+        const rowsWithInvalidDates = validation.invalidDateRows.join(", ");
+        setError(
+          [
+            rowsWithMissing ? `필수값이 빠진 행: ${rowsWithMissing}` : "",
+            rowsWithInvalidDates ? `날짜 형식을 확인할 행: ${rowsWithInvalidDates}` : ""
+          ]
+            .filter(Boolean)
+            .join(" / ") || "WBS를 저장하기 전에 행 오류를 수정해 주세요."
+        );
+      }
       return;
     }
     setSaving(true);
@@ -433,11 +446,11 @@ export default function WbsSetupPage() {
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={() => void saveWbs(false)} disabled={!canSave || saving}>
+              <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={() => void saveWbs(false)} disabled={saving}>
                 <Table2 className="mr-1.5 h-3.5 w-3.5" />
                 WBS 저장
               </Button>
-              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={!canSave || saving}>
+              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={saving}>
                 회의록 입력으로 계속
                 <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
@@ -557,16 +570,16 @@ function EditableWbsTable({
             <thead className="bg-zinc-50 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
               <tr className="border-b border-zinc-200">
                 <th className="w-10 px-3 py-3">#</th>
-                <th className="w-[96px] px-2 py-3">WBS ID*</th>
-                <th className="w-[180px] px-2 py-3">작업명*</th>
-                <th className="w-[230px] px-2 py-3">설명</th>
-                <th className="w-[130px] px-2 py-3">담당자</th>
-                <th className="w-[140px] px-2 py-3">시작일</th>
-                <th className="w-[140px] px-2 py-3">마감일*</th>
-                <th className="w-[110px] px-2 py-3">상태*</th>
-                <th className="w-[130px] px-2 py-3">의존 작업</th>
-                <th className="w-[210px] px-2 py-3">메모</th>
-                <th className="w-[100px] px-2 py-3">검증</th>
+                <th className="w-[96px] px-2 py-3">wbs_id*</th>
+                <th className="w-[180px] px-2 py-3">task_name*</th>
+                <th className="w-[230px] px-2 py-3">description</th>
+                <th className="w-[130px] px-2 py-3">owner</th>
+                <th className="w-[140px] px-2 py-3">start_date</th>
+                <th className="w-[140px] px-2 py-3">due_date*</th>
+                <th className="w-[110px] px-2 py-3">status*</th>
+                <th className="w-[130px] px-2 py-3">dependency</th>
+                <th className="w-[210px] px-2 py-3">notes</th>
+                <th className="w-[100px] px-2 py-3">validation</th>
                 <th className="w-12 px-2 py-3" />
               </tr>
             </thead>
