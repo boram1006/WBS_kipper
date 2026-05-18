@@ -5,25 +5,18 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
-  Calendar,
   Check,
   CheckCircle2,
-  ChevronLeft,
+  ClipboardList,
   Download,
-  EyeOff,
   FileText,
-  Flag,
-  Hash,
   Info,
-  Link2,
-  RefreshCw,
-  Search,
+  Play,
+  Plus,
   Sparkles,
-  StickyNote,
-  Type,
-  Upload,
-  User,
-  X
+  Table2,
+  Trash2,
+  Upload
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -31,119 +24,289 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { useProjectIdFromQuery } from "@/lib/use-project-id";
-import type { WbsColumnMapping, WbsUploadResponse } from "@/lib/types";
+import { setActiveProjectId, useProjectIdFromQuery } from "@/lib/use-project-id";
 import { cn } from "@/lib/utils";
 
-type FieldKey = keyof WbsColumnMapping;
-
-const FIELD_META: Array<{
-  key: FieldKey;
+type StandardColumn = {
+  key: keyof WbsEditableRow;
   label: string;
-  hint: string;
-  icon: React.ComponentType<{ className?: string }>;
-  required?: boolean;
-  patterns: string[];
-}> = [
-  { key: "id", label: "WBS ID", hint: "작업 식별자", icon: Hash, required: true, patterns: ["wbs id", "wbs", "task id", "id", "code", "_row_id"] },
-  { key: "task_name", label: "Task name", hint: "작업명", icon: Type, required: true, patterns: ["task", "name", "title", "작업"] },
-  { key: "owner", label: "Owner", hint: "담당자", icon: User, required: true, patterns: ["owner", "assignee", "담당"] },
-  { key: "due_date", label: "Due date", hint: "마감", icon: Calendar, required: true, patterns: ["due", "deadline", "end", "마감"] },
-  { key: "status", label: "Status", hint: "상태", icon: Flag, required: true, patterns: ["status", "state", "상태"] },
-  { key: "start_date", label: "Start date", hint: "시작일", icon: Calendar, patterns: ["start", "시작"] },
-  { key: "dependency", label: "Depends on", hint: "의존성", icon: Link2, patterns: ["dependency", "depends", "predecessor", "의존"] },
-  { key: "description", label: "Description", hint: "설명", icon: Type, patterns: ["description", "desc", "설명"] },
-  { key: "notes", label: "Notes", hint: "비고", icon: StickyNote, patterns: ["notes", "memo", "comment", "비고", "메모"] }
+  required: boolean;
+  description: string;
+};
+
+type WbsEditableRow = {
+  clientId: string;
+  wbs_id: string;
+  task_name: string;
+  description: string;
+  owner: string;
+  start_date: string;
+  due_date: string;
+  status: string;
+  dependency: string;
+  notes: string;
+};
+
+type ValidationStatus = "empty" | "valid" | "needs_fix" | "missing_required";
+
+const STATUS_OPTIONS = ["예정", "진행중", "완료", "지연", "보류"];
+const REQUIRED_FIELDS: Array<keyof WbsEditableRow> = ["wbs_id", "task_name", "due_date", "status"];
+
+const STANDARD_COLUMNS: StandardColumn[] = [
+  { key: "wbs_id", label: "WBS ID", required: true, description: "Stable task identifier" },
+  { key: "task_name", label: "Task name", required: true, description: "Work item title" },
+  { key: "description", label: "Description", required: false, description: "Short task context" },
+  { key: "owner", label: "Owner", required: false, description: "Person or team responsible" },
+  { key: "start_date", label: "Start date", required: false, description: "YYYY-MM-DD" },
+  { key: "due_date", label: "Due date", required: true, description: "YYYY-MM-DD" },
+  { key: "status", label: "Status", required: true, description: "Planned, in progress, done, held" },
+  { key: "dependency", label: "Dependency", required: false, description: "Preceding WBS ID" },
+  { key: "notes", label: "Notes", required: false, description: "Extra context for review" }
 ];
 
-function suggestMapping(wbs: WbsUploadResponse): WbsColumnMapping {
-  const pick = (patterns: string[]) =>
-    wbs.columns.find((column) => patterns.some((pattern) => column.toLowerCase().includes(pattern.toLowerCase()))) ?? "";
+const STANDARD_COLUMN_KEYS = STANDARD_COLUMNS.map((column) => column.key);
 
+const SAMPLE_ROWS = [
+  ["1.1", "요구사항 정리", "프로젝트 요구사항 초안 작성", "보람", "2026-05-13", "2026-05-17", "진행중", "", ""],
+  ["1.2", "UX 시나리오 작성", "주요 사용자 플로우 정의", "보람", "2026-05-16", "2026-05-20", "예정", "1.1", ""],
+  ["1.3", "GUI 초안 생성", "Figma 기반 화면 초안 생성", "디자인팀", "2026-05-20", "2026-05-24", "예정", "1.2", ""],
+  ["1.4", "개발 구현", "Next.js + FastAPI MVP 개발", "개발팀", "2026-05-24", "2026-05-31", "예정", "1.3", ""],
+  ["1.5", "QA 및 리뷰", "기능 검수 및 피드백 반영", "QA팀", "2026-06-01", "2026-06-05", "예정", "1.4", ""]
+];
+
+function createClientId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function rowFromValues(values: string[]): WbsEditableRow {
   return {
-    id: pick(FIELD_META.find((field) => field.key === "id")!.patterns),
-    task_name: pick(FIELD_META.find((field) => field.key === "task_name")!.patterns),
-    description: pick(FIELD_META.find((field) => field.key === "description")!.patterns),
-    owner: pick(FIELD_META.find((field) => field.key === "owner")!.patterns),
-    start_date: pick(FIELD_META.find((field) => field.key === "start_date")!.patterns),
-    due_date: pick(FIELD_META.find((field) => field.key === "due_date")!.patterns),
-    status: pick(FIELD_META.find((field) => field.key === "status")!.patterns),
-    dependency: pick(FIELD_META.find((field) => field.key === "dependency")!.patterns),
-    notes: pick(FIELD_META.find((field) => field.key === "notes")!.patterns)
+    clientId: createClientId(),
+    wbs_id: values[0] ?? "",
+    task_name: values[1] ?? "",
+    description: values[2] ?? "",
+    owner: values[3] ?? "",
+    start_date: values[4] ?? "",
+    due_date: values[5] ?? "",
+    status: values[6] ?? "예정",
+    dependency: values[7] ?? "",
+    notes: values[8] ?? ""
   };
 }
 
-function sampleValues(wbs: WbsUploadResponse | null, column: string) {
-  if (!wbs || !column) return [];
-  const values = wbs.rows_preview
-    .map((row) => String(row[column] ?? "").trim())
-    .filter(Boolean);
-  return Array.from(new Set(values)).slice(0, 3);
+function emptyRow(nextIndex: number): WbsEditableRow {
+  return rowFromValues([`1.${nextIndex}`, "", "", "", "", "", "예정", "", ""]);
 }
 
-function confidenceFor(index: number, mapped: boolean) {
-  if (!mapped) return 41;
-  return Math.max(65, 96 - index * 4);
+function escapeCsv(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
-export default function WbsUploadPage() {
-  const projectId = useProjectIdFromQuery();
-  const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [wbs, setWbs] = useState<WbsUploadResponse | null>(null);
-  const [mapping, setMapping] = useState<WbsColumnMapping | null>(null);
-  const [query, setQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
+function rowsToCsv(rows: WbsEditableRow[]) {
+  const body = rows.map((row) => STANDARD_COLUMN_KEYS.map((key) => escapeCsv(String(row[key] ?? ""))).join(","));
+  return [STANDARD_COLUMN_KEYS.join(","), ...body].join("\r\n");
+}
 
-  async function upload(selectedFile = file) {
-    if (!selectedFile) return;
-    setUploading(true);
-    setError(null);
-    try {
-      if (!projectId) throw new Error("Project id is missing.");
-      const response = await api.uploadWbs(projectId, selectedFile);
-      setWbs(response);
-      setMapping(suggestMapping(response));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setUploading(false);
+function buildTemplateCsv() {
+  return [STANDARD_COLUMN_KEYS.join(","), ...SAMPLE_ROWS.map((row) => row.map(escapeCsv).join(","))].join("\r\n");
+}
+
+function csvFileFromRows(rows: WbsEditableRow[]) {
+  return new File([`\uFEFF${rowsToCsv(rows)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
+}
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let cell = "";
+  let row: string[] = [];
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      if (row.some((value) => value.trim())) rows.push(row.map((value) => value.trim()));
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
     }
   }
 
-  async function saveMapping() {
-    if (!wbs || !mapping) return;
+  row.push(cell);
+  if (row.some((value) => value.trim())) rows.push(row.map((value) => value.trim()));
+  return rows;
+}
+
+function normalizeUploadedRows(text: string) {
+  const parsed = parseCsv(text.replace(/^\uFEFF/, ""));
+  if (parsed.length === 0) return { columns: [] as string[], rows: [] as WbsEditableRow[] };
+  const columns = parsed[0].map((column) => column.trim());
+  const dataRows = parsed.slice(1).map((values) => {
+    const raw = Object.fromEntries(columns.map((column, index) => [column, values[index] ?? ""]));
+    return rowFromValues(STANDARD_COLUMN_KEYS.map((key) => raw[key] ?? ""));
+  });
+  return { columns, rows: dataRows };
+}
+
+function isIsoDate(value: string) {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function rowErrors(row: WbsEditableRow) {
+  const missing = REQUIRED_FIELDS.filter((field) => !String(row[field] ?? "").trim());
+  const invalidDates = ["start_date", "due_date"].filter((field) => !isIsoDate(String(row[field as keyof WbsEditableRow] ?? "")));
+  return { missing, invalidDates };
+}
+
+function validationFor(rows: WbsEditableRow[], uploadedColumns: string[]) {
+  const missingRequiredColumns = uploadedColumns.length
+    ? REQUIRED_FIELDS.filter((field) => !uploadedColumns.includes(field))
+    : [];
+  const unsupportedColumns = uploadedColumns.filter((column) => !STANDARD_COLUMN_KEYS.includes(column as keyof WbsEditableRow));
+  const rowIssues = rows.map((row, index) => ({ rowIndex: index + 1, ...rowErrors(row) }));
+  const invalidDateRows = rowIssues.filter((issue) => issue.invalidDates.length > 0).map((issue) => issue.rowIndex);
+  const missingRequiredRows = rowIssues.filter((issue) => issue.missing.length > 0).map((issue) => issue.rowIndex);
+  const requiredFound = uploadedColumns.length ? REQUIRED_FIELDS.length - missingRequiredColumns.length : REQUIRED_FIELDS.length;
+
+  let status: ValidationStatus = "valid";
+  if (rows.length === 0) status = "empty";
+  else if (missingRequiredColumns.length > 0) status = "missing_required";
+  else if (invalidDateRows.length > 0 || missingRequiredRows.length > 0) status = "needs_fix";
+
+  return { status, missingRequiredColumns, unsupportedColumns, rowIssues, invalidDateRows, missingRequiredRows, requiredFound };
+}
+
+function statusBadge(status: ValidationStatus) {
+  if (status === "valid") return { label: "Valid", variant: "success" as const };
+  if (status === "missing_required") return { label: "Missing Required Columns", variant: "danger" as const };
+  if (status === "needs_fix") return { label: "Needs Fix", variant: "warning" as const };
+  return { label: "Draft", variant: "outline" as const };
+}
+
+export default function WbsSetupPage() {
+  const projectId = useProjectIdFromQuery();
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [rows, setRows] = useState<WbsEditableRow[]>([]);
+  const [uploadedColumns, setUploadedColumns] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const validation = useMemo(() => validationFor(rows, uploadedColumns), [rows, uploadedColumns]);
+  const badge = statusBadge(validation.status);
+  const canSave = rows.length > 0 && validation.status === "valid";
+
+  function downloadTemplate() {
+    const blob = new Blob([`\uFEFF${buildTemplateCsv()}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "wbs-standard-template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function loadSample() {
+    setRows(SAMPLE_ROWS.map(rowFromValues));
+    setUploadedColumns([...STANDARD_COLUMN_KEYS]);
+    setFileName("Sample WBS");
+    setError(null);
+    setMessage("Sample WBS loaded into the editable table. You can adjust rows before saving.");
+  }
+
+  async function handleFile(selectedFile: File | null) {
+    setError(null);
+    setMessage(null);
+    if (!selectedFile) return;
+    setFileName(selectedFile.name);
+
+    const extension = selectedFile.name.split(".").pop()?.toLowerCase();
+    if (extension !== "csv") {
+      setUploadedColumns([]);
+      setError("Please upload the standard CSV template. Custom Excel layouts are not supported in the MVP.");
+      return;
+    }
+
+    try {
+      const result = normalizeUploadedRows(await selectedFile.text());
+      setUploadedColumns(result.columns);
+      setRows(result.rows);
+      const resultValidation = validationFor(result.rows, result.columns);
+      if (resultValidation.missingRequiredColumns.length > 0) {
+        setError(`This file is missing required columns: ${resultValidation.missingRequiredColumns.join(", ")}.`);
+      } else if (resultValidation.status === "needs_fix") {
+        setError("The file loaded into the editable table, but some rows need fixes before saving.");
+      } else {
+        setMessage("Template loaded into the editable table. Review or edit rows before saving.");
+      }
+    } catch {
+      setUploadedColumns([]);
+      setRows([]);
+      setError("We could not read this file. Please use the standard WBS CSV template.");
+    }
+  }
+
+  function addTask() {
+    setRows((current) => [...current, emptyRow(current.length + 1)]);
+    setMessage("New task row added. Fill the required fields before saving.");
+    setError(null);
+  }
+
+  function updateRow(clientId: string, field: keyof WbsEditableRow, value: string) {
+    setRows((current) => current.map((row) => (row.clientId === clientId ? { ...row, [field]: value } : row)));
+  }
+
+  function deleteRow(clientId: string) {
+    setRows((current) => current.filter((row) => row.clientId !== clientId));
+  }
+
+  async function saveWbs(continueToMeeting = false) {
+    if (!canSave) {
+      setError("Fix required row fields before saving the WBS.");
+      return;
+    }
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
-      if (!projectId) throw new Error("Project id is missing.");
-      await api.mapWbsColumns(projectId, mapping);
-      router.push(routes.meetingNote(projectId));
+      let targetProjectId = projectId;
+      const file = csvFileFromRows(rows);
+      try {
+        await api.uploadWbs(targetProjectId, file);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "";
+        if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
+        const project = await api.createProject({
+          name: "WBS Setup Project",
+          description: "Created from the standard WBS setup table."
+        });
+        targetProjectId = String(project.id);
+        setActiveProjectId(targetProjectId);
+        await api.uploadWbs(targetProjectId, file);
+      }
+      setMessage("WBS saved successfully.");
+      router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Mapping save failed.");
+      setError(err instanceof Error ? err.message : "Could not save this WBS. Please try again.");
     } finally {
       setSaving(false);
     }
   }
-
-  function updateMapping(key: FieldKey, value: string) {
-    setMapping((current) => (current ? { ...current, [key]: value } : current));
-  }
-
-  const requiredFields = FIELD_META.filter((field) => field.required);
-  const optionalFields = FIELD_META.filter((field) => !field.required);
-  const mappedRequired = requiredFields.filter((field) => mapping?.[field.key]).length;
-  const mappedTotal = FIELD_META.filter((field) => mapping?.[field.key]).length;
-  const previewRows = wbs?.rows_preview.slice(0, 8) ?? [];
-  const visibleColumns = useMemo(() => {
-    if (!wbs) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return wbs.columns;
-    return wbs.columns.filter((column) => column.toLowerCase().includes(q));
-  }, [wbs, query]);
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
@@ -153,161 +316,130 @@ export default function WbsUploadPage() {
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div>
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
-                <span>Projects</span>
+                <span>WBS Keeper</span>
                 <span>/</span>
-                <span>AI UX Review Agent</span>
-                <span>/</span>
-                <span>WBS</span>
-                <span>/</span>
-                <span className="text-zinc-700">Import</span>
+                <span className="text-zinc-700">WBS Setup</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-tight text-zinc-950">
-                WBS Import
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium text-zinc-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
-                  Project · AI UX Review Agent
-                </span>
+                WBS Setup
+                <Badge variant={badge.variant} className="border border-current/10">
+                  {badge.label}
+                </Badge>
               </h1>
               <p className="mt-1 text-[13px] leading-5 text-zinc-500">
-                기존 WBS 파일을 업로드하고 컬럼 매핑을 확인하세요. 매핑이 저장되면 회의록 기반 변경 후보를 받을 수 있어요.
+                Start with a standardized WBS template for reliable meeting-based updates.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm">
-                <FileText className="mr-1.5 h-3.5 w-3.5" />
-                Template 다운로드
+              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadTemplate}>
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                Download Template
               </Button>
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm" onClick={() => router.push(routes.project(projectId))}>
-                <X className="mr-1.5 h-3.5 w-3.5" />
-                Cancel
-              </Button>
-              <Button
-                onClick={saveMapping}
-                disabled={!wbs || mappedRequired < requiredFields.length || saving}
-                className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
-              >
-                <Check className="mr-1.5 h-3.5 w-3.5" />
-                Save Mapping
-                <kbd className="ml-2 hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold opacity-90 sm:inline">⌘S</kbd>
+              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={loadSample}>
+                <Play className="mr-1.5 h-3.5 w-3.5" />
+                Use Sample WBS
               </Button>
             </div>
           </div>
         </header>
 
         <main className="min-h-0 flex-1 overflow-auto px-8 py-5 pb-24">
-          <nav className="grid grid-cols-[auto_1fr_auto_1fr_auto] items-center rounded-xl border border-zinc-200 bg-white px-7 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-            <Step done number={1} label="Step 1" name="Upload File" />
-            <div className="mx-4 h-px bg-zinc-200" />
-            <Step active={!!wbs} number={2} label={wbs ? "Step 2 · 진행 중" : "Step 2"} name="Column Mapping" />
-            <div className="mx-4 h-px bg-zinc-200" />
-            <Step number={3} label="Step 3" name="Confirm & Save" />
-          </nav>
-
-          <section className="mt-5 flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx"
-              className="hidden"
-              onChange={(event) => {
-                const selected = event.target.files?.[0] ?? null;
-                setFile(selected);
-                if (selected) void upload(selected);
-              }}
-            />
-            <div className="grid h-11 w-11 place-items-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700">
-              <FileText className="h-5 w-5" />
-              <span className="mt-[-4px] text-[9px] font-bold">{file?.name.toLowerCase().endsWith(".csv") ? "CSV" : "XLSX"}</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-semibold text-zinc-950">{file?.name ?? "WBS 파일을 업로드하세요"}</p>
-                {wbs && (
-                  <Badge variant="success" className="border border-emerald-200">
-                    <Check className="h-3 w-3" />
-                    파일 검증 완료
-                  </Badge>
-                )}
-              </div>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                {wbs ? (
-                  <>
-                    <span className="font-mono">{wbs.total_rows} rows</span>
-                    <span>·</span>
-                    <span className="font-mono">{wbs.columns.length} columns</span>
-                    {file && (
-                      <>
-                        <span>·</span>
-                        <span>{(file.size / 1024).toFixed(1)} KB</span>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <span>CSV 또는 XLSX 파일을 선택하면 첫 행과 컬럼 매핑을 미리 확인합니다.</span>
-                )}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {wbs && (
-                <button className="inline-flex h-8 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 shadow-sm">
-                  <span className="text-zinc-400">Sheet</span>
-                  WBS
-                  <span className="text-zinc-400">1 / 1</span>
-                </button>
+          {(error || message) && (
+            <div
+              className={cn(
+                "mb-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-[12.5px] leading-5",
+                error ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"
               )}
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={() => fileInputRef.current?.click()}>
-                {wbs ? <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}
-                {wbs ? "Re-upload" : "Upload"}
-              </Button>
-              <Button variant="ghost" className="h-8 rounded-lg px-3 text-xs">
-                <EyeOff className="mr-1.5 h-3.5 w-3.5" />
-                Preview 옵션
-              </Button>
-            </div>
-          </section>
-
-          {error && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
+            >
+              {error ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+              <span>{error ?? message}</span>
             </div>
           )}
 
-          <section className="mt-5 grid items-start gap-4 lg:grid-cols-[minmax(420px,0.95fr)_minmax(520px,1.15fr)_360px]">
-            <SourcePreview wbs={wbs} rows={previewRows} visibleColumns={visibleColumns} query={query} onQueryChange={setQuery} />
-            <ColumnMappingPanel wbs={wbs} mapping={mapping} onChange={updateMapping} />
-            <MappingStatusPanel wbs={wbs} mapping={mapping} mappedRequired={mappedRequired} mappedTotal={mappedTotal} />
+          <StandardInfoCard />
+
+          <section className="mt-5 grid gap-4 lg:grid-cols-3">
+            <StartOption
+              icon={Sparkles}
+              title="Use Sample WBS"
+              description="Load ready-made sample rows into the editable table."
+              action={
+                <Button className="h-9 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={loadSample}>
+                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                  Start with Sample WBS
+                </Button>
+              }
+            />
+            <StartOption
+              icon={Download}
+              title="Download Template"
+              description="Download the standard WBS CSV template, fill it out, and upload it back."
+              action={
+                <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadTemplate}>
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  Download Template
+                </Button>
+              }
+            />
+            <StartOption
+              icon={Upload}
+              title="Upload Standard Template"
+              description="Upload a WBS file created from the official template, then edit it here."
+              action={
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(event) => void handleFile(event.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex min-h-[88px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 text-center text-[12.5px] font-medium text-zinc-600 hover:border-zinc-400 hover:bg-white"
+                  >
+                    <Upload className="mb-2 h-5 w-5 text-zinc-500" />
+                    {fileName ?? "Choose standard CSV template"}
+                    <span className="mt-1 text-[11px] font-normal text-zinc-400">CSV only for MVP</span>
+                  </button>
+                </div>
+              }
+            />
+          </section>
+
+          <EditableWbsTable
+            rows={rows}
+            validation={validation}
+            onAdd={addTask}
+            onDelete={deleteRow}
+            onUpdate={updateRow}
+          />
+
+          <section className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(520px,1fr)_390px]">
+            <StandardColumnsCard />
+            <ValidationCard validation={validation} rowCount={rows.length} />
           </section>
         </main>
 
         <div className="sticky bottom-0 z-20 border-t border-zinc-200 bg-white shadow-[0_-8px_24px_-16px_rgba(15,23,42,0.20)]">
           <div className="flex items-center justify-between gap-6 px-8 py-3">
-            <div className="flex shrink-0 items-center gap-3 text-[12.5px]">
-              <span className={cn("grid h-5 w-5 place-items-center rounded-full", mappedRequired === requiredFields.length ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500")}>
-                <Check className="h-3.5 w-3.5" />
+            <div className="flex min-w-0 items-center gap-3 text-[12.5px] text-zinc-500">
+              <span className={cn("grid h-5 w-5 place-items-center rounded-full", canSave ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500")}>
+                {canSave ? <Check className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
               </span>
-              <span className="font-medium text-zinc-900">필수 필드 {mappedRequired}개 모두 매핑</span>
-              <span className="h-4 w-px bg-zinc-200" />
-              <button type="button" className="text-zinc-500 hover:text-zinc-950">이전 매핑 불러오기</button>
-              <button type="button" className="text-zinc-500 hover:text-zinc-950" onClick={() => wbs && setMapping(suggestMapping(wbs))}>매핑 초기화</button>
+              <span className="truncate">
+                {canSave ? "Editable WBS is valid. Save it or continue to Meeting Input." : "Add rows or fix required fields before saving."}
+              </span>
             </div>
-            <p className="hidden min-w-0 items-center gap-1.5 truncate text-[11.5px] text-zinc-500 xl:flex">
-              <Info className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-              저장 시 매핑이 프로젝트에 적용되어 회의록 기반 변경 제안에 사용됩니다.
-            </p>
             <div className="flex shrink-0 items-center gap-2">
-              <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={() => router.push(routes.project(projectId))}>
-                <ChevronLeft className="mr-1.5 h-3.5 w-3.5" />
-                이전 단계
+              <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={() => void saveWbs(false)} disabled={!canSave || saving}>
+                <Table2 className="mr-1.5 h-3.5 w-3.5" />
+                Save WBS
               </Button>
-              <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs">Save as draft</Button>
-              <Button
-                onClick={saveMapping}
-                disabled={!wbs || mappedRequired < requiredFields.length || saving || uploading}
-                className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
-              >
-                <Check className="mr-1.5 h-3.5 w-3.5" />
-                Save Mapping & Continue
-                <kbd className="ml-2 hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold opacity-90 sm:inline">⌘↵</kbd>
+              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={!canSave || saving}>
+                Continue to Meeting Input
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
@@ -317,322 +449,323 @@ export default function WbsUploadPage() {
   );
 }
 
-function Step({ number, label, name, done, active }: { number: number; label: string; name: string; done?: boolean; active?: boolean }) {
+function StandardInfoCard() {
   return (
-    <div className="flex items-center gap-3">
-      <div className={cn("grid h-6 w-6 place-items-center rounded-full border text-xs font-semibold", done && "border-zinc-950 bg-zinc-950 text-white", active && !done && "border-zinc-950 bg-white text-zinc-950", !done && !active && "border-zinc-300 text-zinc-400")}>
-        {done ? <Check className="h-3.5 w-3.5" /> : number}
+    <section className="rounded-xl border border-zinc-200 bg-white px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-start justify-between gap-5">
+        <div className="max-w-3xl">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-zinc-950">
+            <Info className="h-4 w-4 text-zinc-500" />
+            Use a standardized WBS format
+          </h2>
+          <p className="mt-2 text-[13px] leading-6 text-zinc-500">
+            To keep meeting-based updates reliable, WBS Keeper uses a standard WBS template. Merged cells, multi-row
+            headers, and custom Excel formats are not supported in the MVP.
+          </p>
+        </div>
+        <Badge variant="outline" className="rounded-lg border-zinc-200 px-2.5 py-1 text-[11.5px]">
+          MVP template mode
+        </Badge>
       </div>
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">{label}</p>
-        <p className="text-sm font-semibold text-zinc-950">{name}</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        {[
+          "Standard columns are required",
+          "Merged cells are not supported",
+          "Custom Excel layouts will be supported later",
+          "You can edit rows directly in WBS Keeper"
+        ].map((item) => (
+          <div key={item} className="flex items-start gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-[12px] font-medium text-zinc-700">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
+            {item}
+          </div>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
 
-function SourcePreview({
-  wbs,
-  rows,
-  visibleColumns,
-  query,
-  onQueryChange
+function StartOption({
+  icon: Icon,
+  title,
+  description,
+  action
 }: {
-  wbs: WbsUploadResponse | null;
-  rows: Record<string, string>[];
-  visibleColumns: string[];
-  query: string;
-  onQueryChange: (value: string) => void;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  action: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="border-b border-zinc-200 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
+    <section className="flex min-h-[188px] flex-col justify-between rounded-xl border border-zinc-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div>
+        <span className="grid h-9 w-9 place-items-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700">
+          <Icon className="h-4 w-4" />
+        </span>
+        <h2 className="mt-3 text-sm font-semibold text-zinc-950">{title}</h2>
+        <p className="mt-1 text-[12.5px] leading-5 text-zinc-500">{description}</p>
+      </div>
+      <div className="mt-4">{action}</div>
+    </section>
+  );
+}
+
+function EditableWbsTable({
+  rows,
+  validation,
+  onAdd,
+  onDelete,
+  onUpdate
+}: {
+  rows: WbsEditableRow[];
+  validation: ReturnType<typeof validationFor>;
+  onAdd: () => void;
+  onDelete: (clientId: string) => void;
+  onUpdate: (clientId: string, field: keyof WbsEditableRow, value: string) => void;
+}) {
+  const issueMap = new Map(validation.rowIssues.map((issue) => [issue.rowIndex, issue]));
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+        <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
-            <Hash className="h-3.5 w-3.5 text-zinc-500" />
-            Source Preview
+            <Table2 className="h-3.5 w-3.5 text-zinc-500" />
+            Editable WBS Table
           </h2>
-          <span className="text-[11.5px] font-medium text-zinc-400">first 8 rows</span>
+          <p className="mt-1 text-xs text-zinc-500">
+            Add, edit, or delete standard WBS rows without reopening Excel. Dependency can reference an existing WBS ID.
+          </p>
         </div>
-        <p className="mt-1 text-xs text-zinc-500">업로드된 시트의 첫 행이 컬럼 이름으로 인식됩니다.</p>
-        <div className="relative mt-3">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-          <Input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="task · owner · 값 검색..." className="h-[30px] rounded-lg border-zinc-300 bg-white pl-8 text-xs shadow-none" />
-        </div>
+        <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAdd}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Add Task
+        </Button>
       </div>
 
-      <div className="max-h-[520px] overflow-auto">
-        {!wbs ? (
-          <div className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center text-sm text-zinc-500">
-            <Upload className="mb-3 h-8 w-8 text-zinc-300" />
-            WBS 파일을 업로드하면 여기에서 원본 데이터를 확인할 수 있습니다.
-          </div>
-        ) : (
-          <table className="min-w-full border-collapse text-left text-xs">
-            <thead className="sticky top-0 z-10 bg-white">
+      {rows.length === 0 ? (
+        <div className="flex min-h-[260px] flex-col items-center justify-center px-6 text-center text-sm text-zinc-500">
+          <Table2 className="mb-3 h-8 w-8 text-zinc-300" />
+          Start with sample rows, upload the standard template, or add a task manually.
+          <Button variant="outline" className="mt-4 h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={onAdd}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Add Task
+          </Button>
+        </div>
+      ) : (
+        <div className="overflow-auto">
+          <table className="min-w-[1460px] w-full border-collapse text-left text-[12px]">
+            <thead className="bg-zinc-50 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
               <tr className="border-b border-zinc-200">
-                <th className="w-10 px-3 py-2 font-mono text-zinc-400">#</th>
-                {visibleColumns.map((column) => (
-                  <th key={column} className="min-w-[132px] px-3 py-2 font-semibold text-zinc-900">
-                    <div className="space-y-1">
-                      <span>{column}</span>
-                      <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-medium">
-                        → Source column
-                      </Badge>
-                    </div>
-                  </th>
-                ))}
+                <th className="w-10 px-3 py-3">#</th>
+                <th className="w-[96px] px-2 py-3">WBS ID*</th>
+                <th className="w-[180px] px-2 py-3">Task name*</th>
+                <th className="w-[230px] px-2 py-3">Description</th>
+                <th className="w-[130px] px-2 py-3">Owner</th>
+                <th className="w-[140px] px-2 py-3">Start date</th>
+                <th className="w-[140px] px-2 py-3">Due date*</th>
+                <th className="w-[110px] px-2 py-3">Status*</th>
+                <th className="w-[130px] px-2 py-3">Dependency</th>
+                <th className="w-[210px] px-2 py-3">Notes</th>
+                <th className="w-[100px] px-2 py-3">Validation</th>
+                <th className="w-12 px-2 py-3" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-b border-zinc-100 last:border-0">
-                  <td className="px-3 py-2 font-mono text-zinc-500">{rowIndex + 1}</td>
-                  {visibleColumns.map((column) => (
-                    <td key={column} className="max-w-[220px] truncate px-3 py-2 text-zinc-800">
-                      {String(row[column] ?? "-")}
+              {rows.map((row, index) => {
+                const issue = issueMap.get(index + 1);
+                const hasError = Boolean(issue && (issue.missing.length > 0 || issue.invalidDates.length > 0));
+                return (
+                  <tr key={row.clientId} className={cn("border-b border-zinc-100 last:border-0", hasError && "bg-amber-50/40")}>
+                    <td className="px-3 py-2 font-mono text-zinc-400">{index + 1}</td>
+                    <td className="px-2 py-2">
+                      <CellInput value={row.wbs_id} invalid={issue?.missing.includes("wbs_id")} onChange={(value) => onUpdate(row.clientId, "wbs_id", value)} />
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    <td className="px-2 py-2">
+                      <CellInput value={row.task_name} invalid={issue?.missing.includes("task_name")} onChange={(value) => onUpdate(row.clientId, "task_name", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <CellInput value={row.description} onChange={(value) => onUpdate(row.clientId, "description", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <CellInput value={row.owner} onChange={(value) => onUpdate(row.clientId, "owner", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <CellInput type="date" value={row.start_date} invalid={issue?.invalidDates.includes("start_date")} onChange={(value) => onUpdate(row.clientId, "start_date", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <CellInput type="date" value={row.due_date} invalid={issue?.missing.includes("due_date") || issue?.invalidDates.includes("due_date")} onChange={(value) => onUpdate(row.clientId, "due_date", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        value={row.status}
+                        onChange={(event) => onUpdate(row.clientId, "status", event.target.value)}
+                        className={cn(
+                          "h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12px] font-medium text-zinc-800 outline-none focus:border-zinc-400",
+                          issue?.missing.includes("status") && "border-amber-400 bg-amber-50"
+                        )}
+                      >
+                        <option value="">Select</option>
+                        {STATUS_OPTIONS.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <CellInput value={row.dependency} placeholder="e.g. 1.1" onChange={(value) => onUpdate(row.clientId, "dependency", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <CellInput value={row.notes} onChange={(value) => onUpdate(row.clientId, "notes", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      {hasError ? (
+                        <Badge variant="warning" className="border border-amber-200">
+                          Needs Fix
+                        </Badge>
+                      ) : (
+                        <Badge variant="success" className="border border-emerald-200">
+                          Valid
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onDelete(row.clientId)}
+                        className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
+                        aria-label="Delete row"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        )}
-      </div>
-
-      {wbs && (
-        <div className="flex items-center justify-between border-t border-zinc-200 px-4 py-3 text-xs text-zinc-500">
-          <span>
-            Showing <b className="text-zinc-800">1-{Math.min(8, wbs.rows_preview.length)}</b> of {wbs.total_rows}
-          </span>
-          <span className="font-mono">1 / 1</span>
         </div>
       )}
-    </div>
-  );
-}
-
-function ColumnMappingPanel({
-  wbs,
-  mapping,
-  onChange
-}: {
-  wbs: WbsUploadResponse | null;
-  mapping: WbsColumnMapping | null;
-  onChange: (key: FieldKey, value: string) => void;
-}) {
-  const requiredFields = FIELD_META.filter((field) => field.required);
-  const optionalFields = FIELD_META.filter((field) => !field.required);
-  const mappedRequired = requiredFields.filter((field) => mapping?.[field.key]).length;
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="border-b border-zinc-200 px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
-              <Sparkles className="h-3.5 w-3.5 text-zinc-500" />
-              Column Mapping
-            </h2>
-            <p className="mt-1 text-xs text-zinc-500">AI가 자동 제안한 매핑입니다. 각 컬럼의 매칭 대상을 확인하고 필요 시 변경하세요.</p>
-          </div>
-          <div className="relative w-[220px] shrink-0">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-            <Input placeholder="컬럼 / 필드 검색" className="h-[30px] rounded-lg border-zinc-300 bg-white pl-8 text-xs shadow-none" />
-          </div>
-        </div>
-        <div className="mt-3 inline-flex rounded-lg bg-zinc-100 p-0.5">
-          {[
-            ["All", FIELD_META.length],
-            ["Mapped", mapping ? FIELD_META.filter((field) => mapping[field.key]).length : 0],
-            ["Needs review", FIELD_META.length - (mapping ? FIELD_META.filter((field) => mapping[field.key]).length : 0)]
-          ].map(([label, count]) => (
-            <span key={label} className={cn("inline-flex h-[26px] items-center gap-1 rounded-md px-2.5 text-xs font-medium", label === "All" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500")}>
-              {label} <b className="text-[10.5px] text-zinc-400">{count}</b>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <MappingGroup title="Required Fields" meta={`${mappedRequired} / ${requiredFields.length} 매핑됨`} fields={requiredFields} wbs={wbs} mapping={mapping} onChange={onChange} />
-        <MappingGroup title="Optional Fields" meta={`${optionalFields.filter((field) => mapping?.[field.key]).length} / ${optionalFields.length} 매핑됨`} fields={optionalFields} wbs={wbs} mapping={mapping} onChange={onChange} />
-      </div>
-    </div>
-  );
-}
-
-function MappingGroup({
-  title,
-  meta,
-  fields,
-  wbs,
-  mapping,
-  onChange
-}: {
-  title: string;
-  meta: string;
-  fields: typeof FIELD_META;
-  wbs: WbsUploadResponse | null;
-  mapping: WbsColumnMapping | null;
-  onChange: (key: FieldKey, value: string) => void;
-}) {
-  return (
-    <section className="border-b border-zinc-200 last:border-0">
-      <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-500">{title}</span>
-        <span className="text-[11.5px] font-medium text-zinc-400">{meta}</span>
-      </div>
-      {fields.map((field, index) => {
-        const selectedColumn = mapping?.[field.key] ?? "";
-        const mapped = Boolean(selectedColumn);
-        const values = sampleValues(wbs, selectedColumn);
-        const confidence = confidenceFor(index, mapped);
-        const Icon = field.icon;
-
-        return (
-          <div key={field.key} className={cn("grid grid-cols-[1fr_auto_250px_auto] items-center gap-4 border-t border-zinc-100 px-4 py-3", !mapped && "bg-amber-50/40")}>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="grid h-5 w-5 place-items-center rounded bg-zinc-100 text-[10px] font-semibold text-zinc-500">{String.fromCharCode(65 + index)}</span>
-                <span className="font-semibold text-sm text-zinc-950">{field.label}</span>
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{field.hint}</Badge>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {values.length > 0 ? values.map((value) => <span key={value} className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">{value}</span>) : <span className="text-[11.5px] text-zinc-400">샘플 값 없음</span>}
-              </div>
-            </div>
-            <ArrowRight className="h-4 w-4 text-zinc-400" />
-            <div>
-              <label className="relative block">
-                <Icon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-                <select
-                  value={selectedColumn}
-                  onChange={(event) => onChange(field.key, event.target.value)}
-                  disabled={!wbs}
-                  className="h-9 w-full appearance-none rounded-lg border border-zinc-200 bg-white pl-8 pr-8 text-sm text-zinc-800 shadow-sm outline-none disabled:bg-zinc-50 disabled:text-zinc-400"
-                >
-                  <option value="">Ignored · 가져오지 않음</option>
-                  {wbs?.columns.map((column) => <option key={column} value={column}>{column}</option>)}
-                </select>
-              </label>
-              <p className="mt-1 text-[11.5px] text-zinc-500">
-                {mapped ? `AI suggested ${confidence}% · ${confidence >= 80 ? "High" : "Medium"}` : "No suggestion"}
-              </p>
-            </div>
-            <Badge variant={mapped ? "success" : "warning"} className="justify-center border border-current/10">
-              {mapped ? <Check className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-              {mapped ? "Matched" : "Review"}
-            </Badge>
-          </div>
-        );
-      })}
     </section>
   );
 }
 
-function MappingStatusPanel({
-  wbs,
-  mapping,
-  mappedRequired,
-  mappedTotal
+function CellInput({
+  value,
+  onChange,
+  invalid,
+  type = "text",
+  placeholder
 }: {
-  wbs: WbsUploadResponse | null;
-  mapping: WbsColumnMapping | null;
-  mappedRequired: number;
-  mappedTotal: number;
+  value: string;
+  onChange: (value: string) => void;
+  invalid?: boolean;
+  type?: string;
+  placeholder?: string;
 }) {
-  const requiredFields = FIELD_META.filter((field) => field.required);
-  const optionalFields = FIELD_META.filter((field) => !field.required);
-  const total = FIELD_META.length;
-  const progress = total ? Math.round((mappedTotal / total) * 100) : 0;
+  return (
+    <Input
+      type={type}
+      value={value}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      className={cn("h-8 rounded-md border-zinc-200 px-2 text-[12px] shadow-none focus-visible:ring-1", invalid && "border-amber-400 bg-amber-50")}
+    />
+  );
+}
+
+function StandardColumnsCard() {
+  return (
+    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+            <ClipboardList className="h-3.5 w-3.5 text-zinc-500" />
+            Standard column preview
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">Only these columns are used for meeting-based WBS updates.</p>
+        </div>
+        <Badge variant="outline">{STANDARD_COLUMNS.length} columns</Badge>
+      </div>
+      <div className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
+        {STANDARD_COLUMNS.map((column) => (
+          <div key={column.key} className="rounded-lg border border-zinc-200 bg-white px-3 py-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-mono text-[12px] font-semibold text-zinc-950">{column.key}</p>
+                <p className="mt-1 text-[11.5px] text-zinc-500">{column.description}</p>
+              </div>
+              <Badge variant={column.required ? "default" : "outline"} className={column.required ? "bg-zinc-950" : undefined}>
+                {column.required ? "Required" : "Optional"}
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ValidationCard({ validation, rowCount }: { validation: ReturnType<typeof validationFor>; rowCount: number }) {
+  const checks = [
+    {
+      label: "Required columns found",
+      detail: `${validation.requiredFound} / ${REQUIRED_FIELDS.length}`,
+      ok: validation.missingRequiredColumns.length === 0
+    },
+    {
+      label: "Invalid date rows",
+      detail: validation.invalidDateRows.length ? validation.invalidDateRows.join(", ") : "0",
+      ok: validation.invalidDateRows.length === 0
+    },
+    {
+      label: "Rows missing required fields",
+      detail: validation.missingRequiredRows.length ? validation.missingRequiredRows.join(", ") : "0",
+      ok: validation.missingRequiredRows.length === 0
+    },
+    {
+      label: "Unsupported columns ignored",
+      detail: validation.unsupportedColumns.length ? validation.unsupportedColumns.join(", ") : "0",
+      ok: true
+    },
+    {
+      label: "Ready to continue",
+      detail: rowCount ? `${rowCount} rows` : "No rows yet",
+      ok: validation.status === "valid"
+    }
+  ];
+  const badge = statusBadge(validation.status);
 
   return (
     <aside className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="border-b border-zinc-200 px-4 py-4">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
-          <CheckCircle2 className="h-3.5 w-3.5 text-zinc-500" />
-          Mapping Status
-        </h2>
-        <p className="mt-2 text-xs text-zinc-500">필수 필드와 매핑 결과를 확인하세요.</p>
+      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+            <CheckCircle2 className="h-3.5 w-3.5 text-zinc-500" />
+            Validation Summary
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">Fix row issues before saving the WBS.</p>
+        </div>
+        <Badge variant={badge.variant} className="border border-current/10">
+          {badge.label}
+        </Badge>
       </div>
-      <div className="space-y-5 px-4 py-4">
-        <section>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-500">전체 매핑</p>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-[30px] font-semibold leading-none tracking-tight text-zinc-950 tabular-nums">{mappedTotal}</span>
-            <span className="text-sm text-zinc-500">/ {wbs ? wbs.columns.length : total} columns mapped</span>
+      <div className="divide-y divide-zinc-100">
+        {checks.map((check) => (
+          <div key={check.label} className="flex items-center gap-3 px-4 py-3">
+            <span className={cn("grid h-5 w-5 place-items-center rounded-full", check.ok ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400")}>
+              {check.ok ? <Check className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+            </span>
+            <span className="flex-1 text-[12px] font-medium text-zinc-700">{check.label}</span>
+            <span className="max-w-[160px] truncate text-right text-[11px] text-zinc-400">{check.detail}</span>
           </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200">
-            <div className="h-full bg-emerald-700" style={{ width: `${progress}%` }} />
-          </div>
-        </section>
-
-        <StatusGroup title={`필수 필드 · ${mappedRequired} / ${requiredFields.length}`} fields={requiredFields} mapping={mapping} />
-        <StatusGroup title={`선택 필드 · ${optionalFields.filter((field) => mapping?.[field.key]).length} / ${optionalFields.length}`} fields={optionalFields} mapping={mapping} optional />
-
-        <section className="space-y-2 border-t border-zinc-200 pt-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-500">이슈 · {requiredFields.length - mappedRequired}</p>
-          {mappedRequired < requiredFields.length ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-[12.5px] leading-5 text-amber-800">
-              <AlertCircle className="mr-1 inline h-3.5 w-3.5" />
-              필수 WBS 필드와 일치하지 않은 항목이 있습니다. 저장 전 매핑을 지정해 주세요.
-            </div>
-          ) : (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-[12.5px] leading-5 text-emerald-800">
-              <Check className="mr-1 inline h-3.5 w-3.5" />
-              필수 필드가 모두 매핑되었습니다.
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-center">
-          <div className="mx-auto mb-3 grid h-8 w-8 place-items-center rounded-lg bg-zinc-950 text-white">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <h3 className="text-sm font-semibold text-zinc-950">AI suggested mapping</h3>
-          <p className="mt-2 text-xs leading-5 text-zinc-500">
-            샘플 값과 컬럼명을 분석해 자동 매핑을 제안했습니다. 매핑은 프로젝트 단위로 저장됩니다.
-          </p>
-        </section>
+        ))}
       </div>
+      {validation.status === "needs_fix" && (
+        <div className="border-t border-amber-100 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-800">
+          Required fields are WBS ID, task name, due date, and status. Dates must use YYYY-MM-DD.
+        </div>
+      )}
     </aside>
-  );
-}
-
-function StatusGroup({
-  title,
-  fields,
-  mapping,
-  optional
-}: {
-  title: string;
-  fields: typeof FIELD_META;
-  mapping: WbsColumnMapping | null;
-  optional?: boolean;
-}) {
-  return (
-    <section className="space-y-3 border-t border-zinc-200 pt-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-500">{title}</p>
-      <div className="space-y-3">
-        {fields.map((field, index) => {
-          const mapped = Boolean(mapping?.[field.key]);
-          return (
-            <div key={field.key} className="flex items-center gap-3 text-sm">
-              <span className={cn("grid h-4 w-4 place-items-center rounded-full border text-[10px]", mapped ? "border-emerald-200 bg-emerald-50 text-emerald-700" : optional ? "border-zinc-200 bg-zinc-50 text-zinc-400" : "border-amber-200 bg-amber-50 text-amber-700")}>
-                {mapped ? <Check className="h-3 w-3" /> : "!"}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-zinc-950">
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
-                </p>
-                <p className="truncate text-[11.5px] text-zinc-400">← {mapping?.[field.key] || "미매핑"}</p>
-              </div>
-              <span className="text-[11.5px] text-zinc-500 tabular-nums">{mapped ? `${confidenceFor(index, true)}%` : "—"}</span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }

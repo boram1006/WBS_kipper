@@ -62,7 +62,7 @@ export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
           <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">WBS Workflow</p>
           <div className="space-y-0.5">
             <NavItem href={routes.wbs(projectId)} icon={Table2} label="Current WBS" active={pathname === "/wbs"} />
-            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="Import WBS" active={pathname === "/upload"} />
+            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="WBS Setup" active={pathname === "/upload"} />
             <NavItem href={routes.meetingNote(projectId)} icon={Mic} label="Meeting Input" active={pathname === "/meeting-note"} />
             <NavItem href={routes.review(projectId)} icon={CheckSquare} label="Update Review" active={pathname === "/review"} badge={pendingCount} />
             <NavItem href={routes.history(projectId)} icon={History} label="Change History" active={pathname === "/history"} />
