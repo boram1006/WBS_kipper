@@ -69,10 +69,10 @@ export function ProjectSelector({ projectId, onChange, allowCreate = true, prefe
         onChange={(event) => onChange(event.target.value)}
         className="h-8 min-w-[220px] rounded-lg border border-zinc-200 bg-white px-3 text-[12.5px] font-medium text-zinc-800 outline-none focus:border-zinc-400"
       >
-        {!projects.some((project) => String(project.id) === projectId) && <option value={projectId}>Project #{projectId}</option>}
+        {!projects.some((project) => String(project.id) === projectId) && <option value={projectId}>webOS UX</option>}
         {projects.map((project) => (
           <option key={project.id} value={project.id}>
-            {project.name || `Project #${project.id}`}
+            {project.name || "webOS UX"}
           </option>
         ))}
       </select>

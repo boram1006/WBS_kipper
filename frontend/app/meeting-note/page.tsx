@@ -122,7 +122,7 @@ export default function MeetingNotePage() {
   const selectedCandidates = pendingCandidates.filter((candidate) => selected.has(candidate.id));
 
   const readiness = [
-    { label: "프로젝트 선택", ready: Boolean(projectId), detail: projectId ? `Project #${projectId}` : "-" },
+    { label: "프로젝트 선택", ready: Boolean(projectId), detail: projectId ? "webOS UX" : "-" },
     { label: "회의 날짜 선택", ready: Boolean(meetingDate), detail: meetingDate || "-" },
     { label: "회의 제목 입력", ready: Boolean(meetingTitle.trim()), detail: meetingTitle.trim() || "-" },
     { label: "회의록 입력", ready: noteStats.chars >= 10, detail: `${noteStats.chars}자` }

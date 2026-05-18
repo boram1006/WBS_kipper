@@ -64,7 +64,15 @@ def create_project(payload: ProjectCreateRequest) -> dict:
 def list_projects() -> dict:
     with get_conn() as conn:
         _ensure_default_project(conn)
-        rows = conn.execute("SELECT * FROM projects ORDER BY id DESC").fetchall()
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM projects
+            ORDER BY
+                CASE WHEN EXISTS (SELECT 1 FROM wbs_rows w WHERE w.project_id = projects.id) THEN 0 ELSE 1 END,
+                id DESC
+            """
+        ).fetchall()
         return {"projects": [dict(row) for row in rows]}
 
 
@@ -285,6 +293,28 @@ def _ensure_project(conn, project_id: int) -> None:
 
 
 def _ensure_default_project(conn) -> None:
+    project_with_wbs = conn.execute(
+        """
+        SELECT p.id
+        FROM projects p
+        WHERE EXISTS (SELECT 1 FROM wbs_rows w WHERE w.project_id = p.id)
+        ORDER BY p.id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if project_with_wbs:
+        conn.execute(
+            "UPDATE projects SET name = ?, description = ? WHERE id = ?",
+            (DEFAULT_PROJECT_NAME, "Default WBS project.", project_with_wbs["id"]),
+        )
+        return
+    legacy = conn.execute("SELECT id FROM projects WHERE name = ?", ("WBS 설정 프로젝트",)).fetchone()
+    if legacy:
+        conn.execute(
+            "UPDATE projects SET name = ?, description = ? WHERE id = ?",
+            (DEFAULT_PROJECT_NAME, "Default WBS project.", legacy["id"]),
+        )
+        return
     if conn.execute("SELECT id FROM projects WHERE name = ?", (DEFAULT_PROJECT_NAME,)).fetchone():
         return
     conn.execute(

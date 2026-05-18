@@ -395,8 +395,8 @@ export default function WbsSetupPage() {
         const detail = err instanceof Error ? err.message : "";
         if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
         const project = await api.createProject({
-          name: "WBS 설정 프로젝트",
-          description: "표준 WBS 설정 테이블에서 생성한 프로젝트입니다."
+          name: "webOS UX",
+          description: "Default WBS project."
         });
         targetProjectId = String(project.id);
         setActiveProjectId(targetProjectId);
@@ -437,7 +437,7 @@ export default function WbsSetupPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <ProjectSelector projectId={projectId} onChange={setProjectId} />
+              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} preferDefaultProject />
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={clearWbs}>
                 새 WBS
               </Button>
@@ -463,10 +463,9 @@ export default function WbsSetupPage() {
               저장된 WBS를 불러오는 중입니다...
             </div>
           )}
-
-          <StandardInfoCard />
-
           {isCreatingNewWbs && (
+            <>
+            <StandardInfoCard />
             <section className="mt-5 grid gap-4 lg:grid-cols-3">
             <StartOption
               icon={Sparkles}
@@ -516,6 +515,7 @@ export default function WbsSetupPage() {
               }
             />
             </section>
+            </>
           )}
 
           <EditableWbsTable
@@ -525,11 +525,12 @@ export default function WbsSetupPage() {
             onDelete={deleteRow}
             onUpdate={updateRow}
           />
-
-          <section className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(520px,1fr)_390px]">
-            <StandardColumnsCard />
-            <ValidationCard validation={validation} rowCount={rows.length} />
-          </section>
+          {isCreatingNewWbs && (
+            <section className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(520px,1fr)_390px]">
+              <StandardColumnsCard />
+              <ValidationCard validation={validation} rowCount={rows.length} />
+            </section>
+          )}
         </main>
 
         <div className="sticky bottom-0 z-20 border-t border-zinc-200 bg-white shadow-[0_-8px_24px_-16px_rgba(15,23,42,0.20)]">
