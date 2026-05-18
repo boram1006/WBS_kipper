@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { setActiveProjectId, useProjectIdFromQuery } from "@/lib/use-project-id";
+import { loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type WbsRow = {
@@ -211,34 +212,43 @@ function firstValue(row: Record<string, string>, keys: string[], fallback = "") 
   return fallback;
 }
 
-function rowsFromCsv(csv: string): WbsRow[] {
-  const parsed = parseCsv(csv);
-  if (parsed.length < 2) return [];
-  const headers = parsed[0].map((header) => header.trim());
-  return parsed.slice(1).map((values, index) => {
-    const raw = Object.fromEntries(headers.map((header, columnIndex) => [header, values[columnIndex] ?? ""]));
-    const wbsId = firstValue(raw, ["wbs_id", "wbs id", "wbs코드", "id"], `${index + 1}`);
-    const taskName = firstValue(raw, ["task_name", "task name", "작업명", "name"], `Task ${index + 1}`);
+function mappedValue(row: Record<string, string>, mappedColumn: string | undefined, fallbackKeys: string[], fallback = "") {
+  if (mappedColumn && row[mappedColumn] != null && String(row[mappedColumn]).trim()) return String(row[mappedColumn]).trim();
+  return firstValue(row, fallbackKeys, fallback);
+}
+
+function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnapshot["mapping"] = {}): WbsRow[] {
+  return rows.map((raw, index) => {
+    const wbsId = mappedValue(raw, mapping?.id, ["wbs_id", "wbs id", "wbs코드", "id", "_row_id"], `${index + 1}`);
+    const taskName = mappedValue(raw, mapping?.task_name, ["task_name", "task name", "작업명", "task", "name"], `Task ${index + 1}`);
     return {
       wbsId,
       taskName,
-      description: firstValue(raw, ["description", "설명"], "업로드된 WBS row입니다."),
-      owner: firstValue(raw, ["owner", "담당자"], "미정"),
-      startDate: firstValue(raw, ["start_date", "start date", "시작일"], "-"),
-      dueDate: firstValue(raw, ["due_date", "due date", "마감", "마감일"], "-"),
-      status: firstValue(raw, ["status", "상태"], "예정"),
-      dependency: firstValue(raw, ["dependency", "depends on", "의존성"], "-"),
+      description: mappedValue(raw, mapping?.description, ["description", "설명"], "업로드된 WBS row입니다."),
+      owner: mappedValue(raw, mapping?.owner, ["owner", "담당자", "assignee"], "미정"),
+      startDate: mappedValue(raw, mapping?.start_date, ["start_date", "start date", "시작일"], "-"),
+      dueDate: mappedValue(raw, mapping?.due_date, ["due_date", "due date", "마감", "마감일"], "-"),
+      status: mappedValue(raw, mapping?.status, ["status", "상태"], "예정"),
+      dependency: mappedValue(raw, mapping?.dependency, ["dependency", "depends on", "의존성"], "-"),
       lastUpdated: firstValue(raw, ["updated_at", "last updated"], "-"),
       sourceMeeting: firstValue(raw, ["source meeting", "meeting"], "-"),
       badges: [],
       latestUpdate: "업로드된 최신 WBS 데이터입니다.",
       before: "-",
       after: "-",
-      evidence: firstValue(raw, ["notes", "비고"], "업로드된 WBS 원본 row에서 가져왔습니다."),
+      evidence: mappedValue(raw, mapping?.notes, ["notes", "비고"], "업로드된 WBS 원본 row에서 가져왔습니다."),
       relatedHistory: [],
       dependentTasks: []
     };
   });
+}
+
+function rowsFromCsv(csv: string): WbsRow[] {
+  const parsed = parseCsv(csv);
+  if (parsed.length < 2) return [];
+  const headers = parsed[0].map((header) => header.trim());
+  const rawRows = parsed.slice(1).map((values) => Object.fromEntries(headers.map((header, columnIndex) => [header, values[columnIndex] ?? ""])));
+  return normalizeRawRows(rawRows);
 }
 
 export default function CurrentWbsPage() {
@@ -247,7 +257,7 @@ export default function CurrentWbsPage() {
   const [rows, setRows] = useState<WbsRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [usingMock, setUsingMock] = useState(false);
+  const [dataSource, setDataSource] = useState<"api" | "cache" | "mock">("mock");
   const [error, setError] = useState<string | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -266,19 +276,24 @@ export default function CurrentWbsPage() {
         const csv = await api.downloadWbsCsvText(projectId);
         const parsed = rowsFromCsv(csv);
         if (!alive) return;
-        if (parsed.length === 0) {
-          setRows([]);
-        } else {
-          setRows(parsed);
-          setActiveId(parsed[0]?.wbsId ?? null);
-        }
-        setUsingMock(false);
+        setRows(parsed);
+        setActiveId(parsed[0]?.wbsId ?? null);
+        setDataSource("api");
       } catch (err) {
         if (!alive) return;
-        setRows(MOCK_ROWS);
-        setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
-        setUsingMock(true);
-        setError(err instanceof Error ? err.message : "최신 WBS를 불러오지 못해 샘플 데이터를 표시합니다.");
+        const cached = loadWbsSnapshot(projectId);
+        if (cached?.rows_preview?.length) {
+          const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping);
+          setRows(cachedRows);
+          setActiveId(cachedRows[0]?.wbsId ?? null);
+          setDataSource("cache");
+          setError("서버에서 최신 WBS를 불러오지 못해 이 브라우저에 저장된 WBS를 표시합니다.");
+        } else {
+          setRows(MOCK_ROWS);
+          setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
+          setDataSource("mock");
+          setError(err instanceof Error ? err.message : "최신 WBS를 불러오지 못해 샘플 데이터를 표시합니다.");
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -329,13 +344,15 @@ export default function CurrentWbsPage() {
     try {
       const demo = await api.startDemo();
       setActiveProjectId(demo.project.id);
-      setRows(MOCK_ROWS);
-      setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
-      setUsingMock(true);
+      saveWbsSnapshot(demo.project.id, demo.wbs);
+      const demoRows = normalizeRawRows(demo.wbs.rows_preview);
+      setRows(demoRows.length ? demoRows : MOCK_ROWS);
+      setActiveId((demoRows[0] ?? MOCK_ROWS[0])?.wbsId ?? null);
+      setDataSource(demoRows.length ? "cache" : "mock");
     } catch (err) {
       setRows(MOCK_ROWS);
       setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
-      setUsingMock(true);
+      setDataSource("mock");
       setError(err instanceof Error ? err.message : "샘플 데이터를 준비하지 못해 화면용 샘플을 표시합니다.");
     } finally {
       setDemoLoading(false);
@@ -352,17 +369,17 @@ export default function CurrentWbsPage() {
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
                 <span>/</span>
-                <span className="text-zinc-700">현재 WBS</span>
+                <span className="text-zinc-700">Current WBS</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-[-0.024em] text-zinc-950">
-                현재 WBS
+                Current WBS
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium text-zinc-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
-                  최신 프로젝트 계획
+                  Latest approved project plan
                 </span>
               </h1>
               <p className="mt-1 text-[13px] leading-[18px] tracking-[-0.01em] text-zinc-500">
-                승인된 회의 기반 업데이트가 반영된 최신 WBS를 확인합니다.
+                View the latest WBS after approved meeting-based updates.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -372,11 +389,11 @@ export default function CurrentWbsPage() {
               </Button>
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadCsv} disabled={!projectId}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
-                CSV 다운로드
+                Download CSV
               </Button>
-              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => router.push(routes.upload(projectId || "0"))}>
+              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => router.push(routes.upload(projectId))}>
                 <GitBranch className="mr-1.5 h-3.5 w-3.5" />
-                WBS 설정
+                Import New WBS
               </Button>
             </div>
           </div>
@@ -386,14 +403,14 @@ export default function CurrentWbsPage() {
           {loading ? (
             <LoadingState />
           ) : rows.length === 0 ? (
-            <EmptyState onImport={() => router.push(routes.upload(projectId || "0"))} />
+            <EmptyState onImport={() => router.push(routes.upload(projectId))} />
           ) : (
             <div className="grid grid-cols-[minmax(760px,1fr)_360px] gap-4">
               <div className="min-w-0 space-y-4">
-                {error && usingMock && (
-                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-800">
+                {error && (
+                  <div className={cn("flex items-start gap-2 rounded-xl border px-4 py-3 text-[12px] leading-5", dataSource === "cache" ? "border-sky-200 bg-sky-50 text-sky-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>API 연결 실패로 샘플 WBS 데이터를 표시하고 있습니다. 배포된 백엔드가 준비되면 최신 CSV가 표시됩니다.</span>
+                    <span>{error}</span>
                   </div>
                 )}
 
@@ -451,10 +468,7 @@ export default function CurrentWbsPage() {
                           <tr
                             key={row.wbsId}
                             onClick={() => setActiveId(row.wbsId)}
-                            className={cn(
-                              "cursor-pointer border-b border-zinc-100 transition-colors hover:bg-zinc-50",
-                              activeRow?.wbsId === row.wbsId && "bg-zinc-50"
-                            )}
+                            className={cn("cursor-pointer border-b border-zinc-100 transition-colors hover:bg-zinc-50", activeRow?.wbsId === row.wbsId && "bg-zinc-50")}
                           >
                             <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
                             <Td>
@@ -478,9 +492,7 @@ export default function CurrentWbsPage() {
                         ))}
                       </tbody>
                     </table>
-                    {filteredRows.length === 0 && (
-                      <div className="px-6 py-12 text-center text-sm text-zinc-500">조건에 맞는 WBS row가 없습니다.</div>
-                    )}
+                    {filteredRows.length === 0 && <div className="px-6 py-12 text-center text-sm text-zinc-500">조건에 맞는 WBS row가 없습니다.</div>}
                   </div>
                 </section>
               </div>
@@ -510,11 +522,7 @@ function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; l
 
 function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void }) {
   if (!row) {
-    return (
-      <aside className="flex min-h-0 flex-col rounded-xl border border-dashed border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
-        WBS row를 선택하면 상세 정보가 표시됩니다.
-      </aside>
-    );
+    return <aside className="flex min-h-0 flex-col rounded-xl border border-dashed border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">WBS row를 선택하면 상세 정보가 표시됩니다.</aside>;
   }
 
   return (
@@ -562,17 +570,13 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
         </DrawerSection>
 
         <DrawerSection title="Evidence from meeting note">
-          <blockquote className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12.5px] leading-5 text-zinc-700">
-            “{row.evidence}”
-          </blockquote>
+          <blockquote className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12.5px] leading-5 text-zinc-700">“{row.evidence}”</blockquote>
         </DrawerSection>
 
         <DrawerSection title="Related change history">
           <div className="space-y-2">
             {(row.relatedHistory.length ? row.relatedHistory : ["변경 이력이 아직 없습니다."]).map((item) => (
-              <div key={item} className="rounded-lg border border-zinc-200 px-3 py-2 text-[12px] text-zinc-600">
-                {item}
-              </div>
+              <div key={item} className="rounded-lg border border-zinc-200 px-3 py-2 text-[12px] text-zinc-600">{item}</div>
             ))}
           </div>
         </DrawerSection>
@@ -631,11 +635,7 @@ function FilterSelect({
   allLabel: string;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-[12.5px] font-medium text-zinc-700 outline-none focus:border-zinc-400"
-    >
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-[12.5px] font-medium text-zinc-700 outline-none focus:border-zinc-400">
       {options.map((option) => (
         <option key={option} value={option}>
           {option === "all" ? allLabel : labels?.[option] ?? option}

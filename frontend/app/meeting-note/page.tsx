@@ -32,8 +32,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { changeTypeLabel, confidenceLabel, saveMeetingContext } from "@/components/review/review-utils";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { useProjectIdFromQuery } from "@/lib/use-project-id";
 import type { WbsChangeCandidate } from "@/lib/types";
+import { useProjectIdFromQuery } from "@/lib/use-project-id";
 import { cn } from "@/lib/utils";
 
 const SAMPLE_NOTE = `주요 논의 사항
@@ -41,7 +41,7 @@ const SAMPLE_NOTE = `주요 논의 사항
 PRD, UX 시나리오, GUI 초안을 공통 컴포넌트 기반으로 연결하는 워크플로우 개선 방향을 논의함.
 9월 임원 AX 평가 시점을 고려하여 8월까지 MVP 구현 가능한 범위를 검토할 필요가 있음.
 
-3. MVP 착수를 위해 필요한 것
+2. MVP 착수를 위해 필요한 것
 PoC 시나리오 선정이 필요하며, LG Gallery+ 외의 시나리오 추가 여부를 확인하기로 함.
 입출력 데이터는 5월까지 준비하고 입력 데이터 페이지에 업데이트하기로 함.
 PRD 업데이트 및 공유, 전체 일정표 작성, 각 담당 세부 일정 검토 요청은 최보람이 5월 15일까지 진행하기로 함.
@@ -64,7 +64,8 @@ const detectionItems = [
   { key: "owner_changes", label: "담당 변경", description: "작업 담당자 변경", icon: UserRound, tone: "sky" },
   { key: "status_changes", label: "상태 변경", description: "예정, 진행중, 완료, 지연", icon: ClipboardList, tone: "orange" },
   { key: "dependency_changes", label: "의존성 변경", description: "선행 작업과 연결 관계", icon: Link2, tone: "slate" },
-  { key: "risks", label: "리스크", description: "검토가 필요한 이슈", icon: AlertCircle, tone: "rose" }
+  { key: "risks", label: "리스크", description: "검토가 필요한 이슈", icon: AlertCircle, tone: "rose" },
+  { key: "clarification_needed", label: "추가 확인 필요", description: "결정 전 확인할 항목", icon: FileText, tone: "zinc" }
 ] as const;
 
 type DetectionKey = (typeof detectionItems)[number]["key"];
@@ -75,7 +76,8 @@ const toneClass: Record<string, string> = {
   sky: "border-sky-200 bg-sky-50 text-sky-800",
   orange: "border-orange-200 bg-orange-50 text-orange-800",
   slate: "border-slate-200 bg-slate-50 text-slate-800",
-  rose: "border-rose-200 bg-rose-50 text-rose-800"
+  rose: "border-rose-200 bg-rose-50 text-rose-800",
+  zinc: "border-zinc-200 bg-zinc-50 text-zinc-800"
 };
 
 export default function MeetingNotePage() {
@@ -225,7 +227,7 @@ export default function MeetingNotePage() {
                 </span>
               </h1>
               <p className="mt-1 text-[13px] leading-[18px] tracking-[-0.01em] text-zinc-500">
-                회의록을 분석하고 같은 화면에서 WBS 업데이트 후보를 검토한 뒤 선택한 항목만 반영합니다.
+                회의 정보와 분석 설정을 먼저 확인한 뒤 회의록을 분석하고, WBS 업데이트 후보를 같은 화면에서 검토합니다.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -251,7 +253,7 @@ export default function MeetingNotePage() {
         </header>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="min-h-0 flex-1 overflow-auto px-8 py-5 pb-24">
-          <div className="grid grid-cols-[minmax(680px,1fr)_360px] gap-4">
+          <div className="grid grid-cols-[minmax(720px,1fr)_320px] gap-4">
             <div className="space-y-4">
               <Panel
                 step="1"
@@ -303,53 +305,8 @@ export default function MeetingNotePage() {
 
               <Panel
                 step="2"
-                title="회의록 원문"
-                description="회의록을 그대로 붙여 넣으세요. 결정 사항, 일정, 담당자, 리스크, 후속 확인 항목을 중심으로 분석합니다."
-                action={
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]" onClick={loadSample}>
-                      <FileText className="mr-1.5 h-3.5 w-3.5" />
-                      샘플 불러오기
-                    </Button>
-                    <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]">
-                      <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      회의록 업로드
-                    </Button>
-                    <Button type="button" variant="ghost" className="h-7 rounded-lg px-2.5 text-[11.5px] text-zinc-500" onClick={clearNote}>
-                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                      지우기
-                    </Button>
-                  </div>
-                }
-              >
-                <div className="relative">
-                  <Textarea
-                    className="min-h-[280px] resize-y rounded-none border-0 px-4 py-4 text-[13px] leading-[22px] tracking-[-0.01em] shadow-none focus-visible:ring-0"
-                    placeholder="회의록 원문을 입력하세요..."
-                    {...form.register("meeting_note")}
-                  />
-                  <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    후보 {Math.max(0, Math.min(9, Math.round(noteStats.chars / 180)))}건 예상
-                  </div>
-                </div>
-                <div className="flex items-center justify-between border-t border-zinc-100 px-4 py-3 text-[11px] text-zinc-400">
-                  <span className="font-medium uppercase tracking-[0.05em]">Markdown 지원</span>
-                  <div className="flex items-center divide-x divide-zinc-100 text-center">
-                    <Stat value={noteStats.chars} label="글자" />
-                    <Stat value={noteStats.lines} label="줄" />
-                    <Stat value={`~${noteStats.minutes}`} label="분" />
-                  </div>
-                </div>
-                {form.formState.errors.meeting_note && (
-                  <p className="px-4 pb-3 text-[12px] text-red-600">{form.formState.errors.meeting_note.message}</p>
-                )}
-              </Panel>
-
-              <Panel
-                step="3"
                 title="AI 분석 설정"
-                description="이번 회의록에서 어떤 WBS 변경 후보를 추출할지 선택하세요."
+                description="회의록을 붙여넣기 전에 어떤 WBS 변경 후보를 추출할지 먼저 확인하세요."
                 action={
                   <button
                     type="button"
@@ -397,10 +354,53 @@ export default function MeetingNotePage() {
                   <Switch checked={autoMatch} onCheckedChange={setAutoMatch} />
                 </div>
               </Panel>
-            </div>
 
-            <aside className="space-y-4">
-              <ReviewInlinePanel
+              <Panel
+                step="3"
+                title="회의록 원문"
+                description="회의록을 그대로 붙여 넣으세요. 결정 사항, 일정, 담당자, 리스크, 후속 확인 항목을 중심으로 분석합니다."
+                action={
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]" onClick={loadSample}>
+                      <FileText className="mr-1.5 h-3.5 w-3.5" />
+                      샘플 불러오기
+                    </Button>
+                    <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]">
+                      <Upload className="mr-1.5 h-3.5 w-3.5" />
+                      회의록 업로드
+                    </Button>
+                    <Button type="button" variant="ghost" className="h-7 rounded-lg px-2.5 text-[11.5px] text-zinc-500" onClick={clearNote}>
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      지우기
+                    </Button>
+                  </div>
+                }
+              >
+                <div className="relative">
+                  <Textarea
+                    className="min-h-[280px] resize-y rounded-none border-0 px-4 py-4 text-[13px] leading-[22px] tracking-[-0.01em] shadow-none focus-visible:ring-0"
+                    placeholder="회의록 원문을 입력하세요..."
+                    {...form.register("meeting_note")}
+                  />
+                  <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    변경 후보 {Math.max(0, Math.min(9, Math.round(noteStats.chars / 90)))}개 예상
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-zinc-100 px-4 py-3 text-[11px] text-zinc-400">
+                  <span className="font-medium uppercase tracking-[0.05em]">Markdown 지원</span>
+                  <div className="flex items-center divide-x divide-zinc-100 text-center">
+                    <Stat value={noteStats.chars} label="글자" />
+                    <Stat value={noteStats.lines} label="줄" />
+                    <Stat value={`~${noteStats.minutes}`} label="분" />
+                  </div>
+                </div>
+                {form.formState.errors.meeting_note && (
+                  <p className="px-4 pb-3 text-[12px] text-red-600">{form.formState.errors.meeting_note.message}</p>
+                )}
+              </Panel>
+
+              <CandidateReviewPanel
                 analysisDone={analysisDone}
                 candidates={pendingCandidates}
                 selected={selected}
@@ -409,7 +409,9 @@ export default function MeetingNotePage() {
                 onApply={() => void applySelected()}
                 onOpenFullReview={() => router.push(routes.review(projectId))}
               />
+            </div>
 
+            <aside className="space-y-4">
               <div className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                 <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-400">분석 준비 상태</p>
@@ -443,11 +445,11 @@ export default function MeetingNotePage() {
 
         <div className="fixed bottom-0 left-[240px] right-0 z-40 flex h-[58px] items-center justify-between border-t border-zinc-200 bg-white/95 px-8 backdrop-blur">
           <div className="flex items-center gap-2 text-[12px] text-zinc-500">
-            <span className={cn("h-1.5 w-1.5 rounded-full", error ? "bg-amber-600" : "bg-emerald-600")} />
-            {message || "회의록 분석 후 오른쪽에서 업데이트 후보를 바로 검토할 수 있습니다."}
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+            {message || "회의 정보, 분석 설정, 회의록 원문을 확인한 뒤 WBS 업데이트 후보를 검토하세요."}
           </div>
           <div className="flex items-center gap-2">
-            {error && <span className="mr-2 max-w-[520px] truncate text-[12px] text-amber-700">{error}</span>}
+            {error && <span className="mr-2 text-[12px] text-amber-700">{error}</span>}
             <Button variant="outline" type="button" className="h-8 rounded-lg px-3 text-xs">
               임시 저장
             </Button>
@@ -468,7 +470,7 @@ export default function MeetingNotePage() {
   );
 }
 
-function ReviewInlinePanel({
+function CandidateReviewPanel({
   analysisDone,
   candidates,
   selected,
@@ -486,73 +488,99 @@ function ReviewInlinePanel({
   onOpenFullReview: () => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-400">업데이트 검토</p>
-          <h2 className="mt-1 text-[14px] font-semibold leading-5 text-zinc-950">WBS 업데이트 후보</h2>
+    <Panel
+      step="4"
+      title="WBS 업데이트 후보"
+      description="AI가 추출한 변경 후보를 evidence와 before/after 기준으로 검토하세요. 승인한 항목만 WBS에 반영됩니다."
+      action={
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]" onClick={onOpenFullReview}>
+            전체 검토 화면
+          </Button>
+          <Button
+            type="button"
+            className="h-7 rounded-lg bg-zinc-950 px-2.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800"
+            disabled={selected.size === 0 || applying}
+            onClick={onApply}
+          >
+            {applying ? "반영 중..." : `${selected.size}건 WBS에 반영`}
+          </Button>
         </div>
-        <Badge variant="outline" className="rounded-md text-[11px]">
-          {candidates.length}건
-        </Badge>
-      </div>
-
+      }
+    >
       {!analysisDone ? (
-        <div className="px-4 py-10 text-center">
-          <Sparkles className="mx-auto h-7 w-7 text-zinc-300" />
-          <p className="mt-3 text-[13px] font-semibold text-zinc-800">아직 분석 전입니다.</p>
-          <p className="mt-1 text-[12px] leading-5 text-zinc-500">회의록을 입력하고 분석하면 후보가 이 영역에 표시됩니다.</p>
+        <div className="flex min-h-[180px] items-center justify-center border-t border-zinc-100 px-6 py-10 text-center">
+          <div>
+            <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <p className="mt-3 text-sm font-semibold text-zinc-950">아직 분석된 후보가 없습니다.</p>
+            <p className="mt-1 text-[12.5px] leading-5 text-zinc-500">회의록 분석을 실행하면 WBS 업데이트 후보가 이 영역에 표시됩니다.</p>
+          </div>
         </div>
       ) : candidates.length === 0 ? (
-        <div className="px-4 py-10 text-center">
-          <Check className="mx-auto h-7 w-7 text-emerald-500" />
-          <p className="mt-3 text-[13px] font-semibold text-zinc-800">검토할 후보가 없습니다.</p>
-          <p className="mt-1 text-[12px] leading-5 text-zinc-500">명확한 WBS 변경 항목이 감지되지 않았습니다.</p>
-        </div>
+        <div className="px-6 py-8 text-center text-sm text-zinc-500">승인 대기 중인 WBS 업데이트 후보가 없습니다.</div>
       ) : (
-        <div className="max-h-[520px] divide-y divide-zinc-100 overflow-auto">
+        <div className="divide-y divide-zinc-100">
           {candidates.map((candidate) => {
             const checked = selected.has(candidate.id);
             return (
-              <label key={candidate.id} className="flex cursor-pointer gap-3 px-4 py-3 hover:bg-zinc-50">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-zinc-300"
-                  checked={checked}
-                  onChange={(event) => onToggle(candidate.id, event.target.checked)}
-                />
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => onToggle(candidate.id)}
+                className="flex w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-zinc-50"
+              >
+                <span className={cn("mt-1 grid h-4 w-4 shrink-0 place-items-center rounded border", checked ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-300 bg-white text-transparent")}>
+                  <Check className="h-3 w-3" />
+                </span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-[12.5px] font-semibold text-zinc-950">{candidate.task_name}</span>
-                    <span className="shrink-0 rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[13px] font-semibold text-zinc-950">{candidate.task_name}</span>
+                    <CandidateBadge>{changeTypeLabel(candidate.change_type)}</CandidateBadge>
+                    <CandidateBadge tone={candidate.confidence === "high" ? "green" : candidate.confidence === "medium" ? "amber" : "zinc"}>
                       {confidenceLabel(candidate.confidence)}
+                    </CandidateBadge>
+                    {candidate.requires_confirmation && <CandidateBadge tone="red">확인 필요</CandidateBadge>}
+                  </span>
+                  <span className="mt-2 grid gap-2 text-[12px] text-zinc-600 md:grid-cols-[1fr_auto_1fr]">
+                    <span className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+                      <b className="mr-1 text-zinc-400">Before</b>
+                      {candidate.current_value || "-"}
+                    </span>
+                    <ArrowRight className="mx-auto mt-2 h-3.5 w-3.5 text-zinc-400" />
+                    <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">
+                      <b className="mr-1 text-emerald-600">After</b>
+                      {candidate.proposed_value || "-"}
                     </span>
                   </span>
-                  <span className="mt-1 block text-[11.5px] leading-4 text-zinc-500">
-                    {changeTypeLabel(candidate.change_type)} · {candidate.proposed_value || candidate.field || "업데이트 후보"}
+                  <span className="mt-2 block rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[12px] leading-5 text-zinc-600">
+                    <b className="mr-1 text-zinc-400">Evidence</b>
+                    “{candidate.evidence}”
                   </span>
-                  <span className="mt-1 line-clamp-2 block text-[11px] leading-4 text-zinc-400">{candidate.evidence}</span>
                 </span>
-              </label>
+              </button>
             );
           })}
         </div>
       )}
+    </Panel>
+  );
+}
 
-      <div className="space-y-2 border-t border-zinc-100 p-4">
-        <Button
-          type="button"
-          className="h-[34px] w-full rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
-          disabled={selected.size === 0 || applying}
-          onClick={onApply}
-        >
-          {applying ? "반영 중..." : `선택 항목 WBS 반영 (${selected.size})`}
-        </Button>
-        <Button type="button" variant="outline" className="h-8 w-full rounded-lg px-3 text-xs" onClick={onOpenFullReview}>
-          전체 검토 화면 열기
-        </Button>
-      </div>
-    </section>
+function CandidateBadge({ children, tone = "zinc" }: { children: ReactNode; tone?: "zinc" | "green" | "amber" | "red" }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded border px-1.5 py-0.5 text-[10.5px] font-semibold",
+        tone === "green" && "border-emerald-200 bg-emerald-50 text-emerald-800",
+        tone === "amber" && "border-amber-200 bg-amber-50 text-amber-800",
+        tone === "red" && "border-rose-200 bg-rose-50 text-rose-800",
+        tone === "zinc" && "border-zinc-200 bg-zinc-50 text-zinc-700"
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -586,11 +614,21 @@ function Panel({
   );
 }
 
-function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: ReactNode }) {
+function Field({
+  label,
+  required,
+  error,
+  children
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: ReactNode;
+}) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.04em] text-zinc-400">
-        {label} {required && <b className="text-red-500">*</b>}
+      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-500">
+        {label} {required && <span className="text-[#fd312e]">*</span>}
       </span>
       {children}
       {error && <span className="mt-1 block text-[11px] text-red-600">{error}</span>}
@@ -598,11 +636,11 @@ function Field({ label, required, error, children }: { label: string; required?:
   );
 }
 
-function Stat({ value, label }: { value: ReactNode; label: string }) {
+function Stat({ value, label }: { value: string | number; label: string }) {
   return (
-    <span className="px-3">
-      <b className="block text-[12px] font-semibold text-zinc-700">{value}</b>
-      <span className="mt-0.5 block text-[10px] text-zinc-400">{label}</span>
+    <span className="min-w-[58px] px-4">
+      <span className="block text-[11.5px] font-semibold text-zinc-700">{value}</span>
+      <span className="block text-[10.5px] text-zinc-400">{label}</span>
     </span>
   );
 }

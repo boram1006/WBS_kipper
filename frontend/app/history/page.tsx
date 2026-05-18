@@ -270,27 +270,27 @@ export default function HistoryPage() {
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
                 <span>/</span>
-                <span className="text-zinc-700">변경 이력</span>
+                <span className="text-zinc-700">Change History</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-[-0.024em] text-zinc-950">
-                변경 이력
+                Change History
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium text-zinc-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
-                  승인 이력
+                  Audit trail
                 </span>
               </h1>
               <p className="mt-1 text-[13px] leading-[18px] tracking-[-0.01em] text-zinc-500">
-                승인된 WBS 변경 사항과 회의 근거, 변경 전후 값을 확인합니다.
+                Track approved WBS changes with meeting evidence and before/after values.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={exportHistory}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
-                이력 내보내기
+                Export History
               </Button>
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={() => (window.location.href = api.downloadWbsUrl(projectId))}>
                 <FileDown className="mr-1.5 h-3.5 w-3.5" />
-                현재 WBS 다운로드
+                Download Current WBS
               </Button>
             </div>
           </div>

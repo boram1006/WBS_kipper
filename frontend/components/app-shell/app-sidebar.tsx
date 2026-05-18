@@ -59,20 +59,20 @@ export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
 
       <nav className="flex-1 space-y-5 overflow-y-auto">
         <div>
-          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">WBS 작업 흐름</p>
+          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">WBS Workflow</p>
           <div className="space-y-0.5">
-            <NavItem href={routes.wbs(projectId)} icon={Table2} label="현재 WBS" active={pathname === "/wbs"} />
-            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="WBS 설정" active={pathname === "/upload"} />
-            <NavItem href={routes.meetingNote(projectId)} icon={Mic} label="회의록 입력" active={pathname === "/meeting-note"} />
-            <NavItem href={routes.review(projectId)} icon={CheckSquare} label="업데이트 검토" active={pathname === "/review"} badge={pendingCount} />
-            <NavItem href={routes.history(projectId)} icon={History} label="변경 이력" active={pathname === "/history"} />
+            <NavItem href={routes.wbs(projectId)} icon={Table2} label="Current WBS" active={pathname === "/wbs"} />
+            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="Import WBS" active={pathname === "/upload"} />
+            <NavItem href={routes.meetingNote(projectId)} icon={Mic} label="Meeting Input" active={pathname === "/meeting-note"} />
+            <NavItem href={routes.review(projectId)} icon={CheckSquare} label="Update Review" active={pathname === "/review"} badge={pendingCount} />
+            <NavItem href={routes.history(projectId)} icon={History} label="Change History" active={pathname === "/history"} />
           </div>
         </div>
 
         <div>
-          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">프로젝트</p>
+          <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">Project</p>
           <div className="space-y-0.5">
-            <NavItem href={routes.project(projectId)} icon={ClipboardList} label="프로젝트 상세" active={pathname === "/project"} />
+            <NavItem href={routes.project(projectId)} icon={ClipboardList} label="Project Detail" active={pathname === "/project"} />
           </div>
         </div>
       </nav>
