@@ -332,6 +332,7 @@ export default function WbsSetupPage() {
         setActiveProjectId(targetProjectId);
         await uploadAndMapStandardWbs(targetProjectId, file);
       }
+      setActiveProjectId(targetProjectId);
       setMessage("WBS가 저장되었습니다.");
       router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {

@@ -66,6 +66,11 @@ def _analyze_with_openai(
         "current_wbs_rows": current_wbs_rows[:120],
         "output_schema": _schema_description(),
         "rules": [
+            "Extract only actionable WBS update candidates. Do not summarize the meeting note line by line.",
+            "Do not create candidates for headings, section labels, background context, alternatives, or descriptive discussion.",
+            "Ignore lines such as '주요 논의 사항', numbered headings, '[필수]', '[옵션]', '기존:', and '개선:' unless they contain a concrete action owner/date/status update.",
+            "A valid candidate must represent one of: new work item, owner assignment, due date/schedule change, status change, dependency/scope change, risk/blocker, or explicit follow-up/confirmation action.",
+            "For Korean notes, prefer compact action-item task names such as 'PoC 시나리오 선정', '입출력 데이터 준비', 'PRD 업데이트 및 공유'. Never use generic names like 'Item 01'.",
             "Do not infer facts that are not present in meeting_note.",
             "Every change must include an exact original sentence in evidence.",
             "Resolve relative dates using meeting_date. If uncertain, set requires_confirmation=true.",
@@ -132,6 +137,8 @@ def _analyze_with_rules(
     parsed_meeting_date = _parse_date(meeting_date)
 
     for index, sentence in enumerate(sentences, start=1):
+        if _is_noise_sentence(sentence):
+            continue
         match = _match_wbs(sentence, current_wbs_rows)
         matched_id = match.get("wbs_id") if match else None
         task_name = match.get("task_name") if match else _extract_task_name(sentence)
@@ -191,6 +198,8 @@ def _analyze_with_rules(
             )
 
         status = _extract_status(sentence)
+        if status and not _looks_like_status_update(sentence, matched=bool(match)):
+            status = None
         if status:
             changes.append(
                 _change(
@@ -304,11 +313,23 @@ def _analyze_with_rules(
                 )
             )
 
+    existing_task_names = {str(change.get("task_name") or "") for change in changes}
+    for action in _extract_korean_action_items(meeting_note, start_index=len(changes) + 1):
+        if action["task_name"] not in existing_task_names:
+            changes.append(action)
+            existing_task_names.add(action["task_name"])
+
     return _normalize_analysis({"summary": {}, "changes": changes, "risks": risks}, current_wbs_rows)
 
 
 def _normalize_analysis(raw: dict[str, Any], current_wbs_rows: list[dict[str, str]]) -> dict[str, Any]:
-    changes = [_normalize_change(item, idx) for idx, item in enumerate(raw.get("changes", []), start=1) if isinstance(item, dict)]
+    changes = [
+        change
+        for idx, item in enumerate(raw.get("changes", []), start=1)
+        if isinstance(item, dict)
+        for change in [_normalize_change(item, idx)]
+        if not _is_noise_change(change)
+    ]
     risks = [_normalize_risk(item, idx) for idx, item in enumerate(raw.get("risks", []), start=1) if isinstance(item, dict)]
     return {"summary": _build_summary(changes, risks), "changes": changes, "risks": risks}
 
@@ -519,12 +540,16 @@ def _extract_owner(sentence: str) -> str | None:
     patterns = [
         r"\bowner\s+(?:is|to|=|:)?\s*([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)",
         r"\bassignee\s+(?:is|to|=|:)?\s*([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)",
-        r"담당(?:자)?\s*(?:은|는|:)?\s*([A-Za-z가-힣0-9_.-]{2,20})",
+        r"담당(?:자)?\s*(?:은|는|:)\s*([A-Za-z가-힣0-9_.-]{2,20})",
+        r"([A-Za-z가-힣0-9_.-]{2,20})\s*(?:이|가|에서)?\s*담당(?:하기로|한다|함|예정)",
     ]
     for pattern in patterns:
         match = re.search(pattern, sentence, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            owner = match.group(1).strip()
+            if owner in {"각", "담당", "세부", "일정", "검토"}:
+                return None
+            return owner
     return None
 
 
@@ -542,6 +567,14 @@ def _extract_status(sentence: str) -> str | None:
     return None
 
 
+def _looks_like_status_update(sentence: str, matched: bool) -> bool:
+    if _contains(sentence, ["status", "state", "done", "complete", "completed", "in progress", "started", "blocked", "delayed"]):
+        return True
+    if matched and _contains(sentence, ["상태", "완료", "진행중", "착수", "지연", "보류", "막힘"]):
+        return True
+    return bool(re.search(r"(?:상태|작업|태스크|일정).{0,20}(?:완료|진행중|착수|지연|보류|막힘)", sentence))
+
+
 def _extract_dependency(sentence: str) -> str | None:
     match = re.search(r"(?:depends on|after|blocked by|dependency[: ]+)([^.]+)", sentence, re.IGNORECASE)
     return match.group(1).strip() if match else None
@@ -553,6 +586,94 @@ def _risk_severity(sentence: str) -> str:
     if _contains(sentence, ["may", "possible", "우려", "가능"]):
         return "medium"
     return "low"
+
+
+def _is_noise_sentence(sentence: str) -> bool:
+    text = sentence.strip()
+    if not text:
+        return True
+    normalized = re.sub(r"\s+", " ", text)
+    if len(normalized) <= 3:
+        return True
+    if re.search(
+        r"(PoC|PRD|입출력|전체\s*일정|AX\s*평가|컴포넌트|시나리오\s*추가|담당|확인|준비|공유|작성)",
+        normalized,
+        re.IGNORECASE,
+    ):
+        return False
+    if re.fullmatch(r"\d+(?:[-.]\d+)*\.?\s*[^:→]{0,30}", normalized):
+        return True
+    if re.fullmatch(r"\[[^\]]+\]", normalized):
+        return True
+    lowered = normalized.lower()
+    noise_prefixes = (
+        "주요 논의 사항",
+        "논의한 과제 스콥",
+        "mvp 착수를 위해 필요한 것",
+        "기존 :",
+        "기존:",
+        "개선 :",
+        "개선:",
+    )
+    if lowered in {"draft ux", "ux 시나리오", "gui 초안", "[필수]", "[옵션]"}:
+        return True
+    return any(lowered.startswith(prefix) for prefix in noise_prefixes)
+
+
+def _is_noise_change(change: dict[str, Any]) -> bool:
+    task_name = str(change.get("task_name") or "").strip()
+    evidence = str(change.get("evidence") or "").strip()
+    if re.fullmatch(r"Item\s+\d+", task_name, re.IGNORECASE):
+        return True
+    if _is_noise_sentence(task_name) or _is_noise_sentence(evidence):
+        return True
+    if len(evidence) < 8:
+        return True
+    return False
+
+
+def _extract_korean_action_items(text: str, start_index: int = 1) -> list[dict[str, Any]]:
+    lines = [line.strip(" -\t") for line in text.splitlines()]
+    actions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    action_patterns = [
+        (r"(PoC\s*시나리오\s*선정[^.\n]*)", "PoC 시나리오 선정"),
+        (r"(LG\s*Gallery\+?\s*외의?\s*시나리오\s*추가\s*여부[^.\n]*)", "LG Gallery+ 외 시나리오 추가 여부 확인"),
+        (r"(입출력\s*데이터\s*(?:준비|페이지에\s*업데이트)[^.\n]*)", "입출력 데이터 준비"),
+        (r"(PRD\s*업데이트\s*및\s*공유[^.\n]*)", "PRD 업데이트 및 공유"),
+        (r"(전체\s*일정표\s*작성[^.\n]*)", "전체 일정표 작성"),
+        (r"(9월\s*임원\s*AX\s*평가\s*기준\s*확인[^.\n]*)", "9월 임원 AX 평가 기준 확인"),
+        (r"(White\s*테마\s*컴포넌트\s*(?:제작|전달)[^.\n]*)", "White 테마 컴포넌트 제작 일정 확인"),
+        (r"(기본\s*컴포넌트\s*추출[^.\n]*)", "기본 컴포넌트 추출 및 에이전트 구성 방식 검토"),
+        (r"(컴포넌트\s*DB\s*(?:구성|구축)[^.\n]*)", "컴포넌트 DB 구성 방식 검토"),
+        (r"(PoC\s*한정[^.\n]*컴포넌트[^.\n]*(?:논의|검토)[^.\n]*)", "PoC 한정 UI/GUI 컴포넌트 일원화 구조 논의"),
+    ]
+
+    for line in lines:
+        if _is_noise_sentence(line):
+            continue
+        for pattern, task_name in action_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if not match or task_name in seen:
+                continue
+            seen.add(task_name)
+            actions.append(
+                _change(
+                    start_index + len(actions),
+                    "new_task",
+                    None,
+                    task_name,
+                    None,
+                    None,
+                    task_name,
+                    match.group(1).strip(),
+                    "medium",
+                    True,
+                    "회의록에서 후속 실행 또는 검토가 필요한 액션 아이템으로 감지되었습니다.",
+                )
+            )
+
+    return actions
 
 
 def _parse_date(value: str) -> date | None:

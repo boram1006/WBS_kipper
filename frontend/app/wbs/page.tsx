@@ -352,17 +352,17 @@ export default function CurrentWbsPage() {
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
                 <span>/</span>
-                <span className="text-zinc-700">Current WBS</span>
+                <span className="text-zinc-700">현재 WBS</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-[-0.024em] text-zinc-950">
-                Current WBS
+                현재 WBS
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium text-zinc-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
-                  Latest approved project plan
+                  최신 프로젝트 계획
                 </span>
               </h1>
               <p className="mt-1 text-[13px] leading-[18px] tracking-[-0.01em] text-zinc-500">
-                View the latest WBS after approved meeting-based updates.
+                승인된 회의 기반 업데이트가 반영된 최신 WBS를 확인합니다.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -372,11 +372,11 @@ export default function CurrentWbsPage() {
               </Button>
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadCsv} disabled={!projectId}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
-                Download CSV
+                CSV 다운로드
               </Button>
               <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => router.push(routes.upload(projectId || "0"))}>
                 <GitBranch className="mr-1.5 h-3.5 w-3.5" />
-                Import New WBS
+                WBS 설정
               </Button>
             </div>
           </div>

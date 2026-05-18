@@ -44,14 +44,14 @@ export function ReviewPageHeader({
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
-            <Link href="/" className="hover:text-zinc-700">Projects</Link>
+            <Link href="/" className="hover:text-zinc-700">WBS Keeper</Link>
             <span>/</span>
             <Link href={routes.project(projectId)} className="hover:text-zinc-700">{projectName}</Link>
             <span>/</span>
-            <span className="text-zinc-700">Update Review</span>
+            <span className="text-zinc-700">업데이트 검토</span>
           </nav>
           <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-tight text-zinc-950">
-            Meeting-to-WBS Review
+            업데이트 검토
             <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium text-zinc-700">
               <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
               {meeting.meeting_title} · {meeting.meeting_date.replace(/-/g, ".")}
@@ -66,13 +66,13 @@ export function ReviewPageHeader({
           <Link href={routes.meetingNote(projectId)}>
             <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm">
               <History className="mr-1.5 h-3.5 w-3.5" />
-              이전 회의 보기
+              회의록 입력
             </Button>
           </Link>
           <a href={api.downloadWbsUrl(projectId)}>
             <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm">
               <Download className="mr-1.5 h-3.5 w-3.5" />
-              Export
+              CSV 다운로드
             </Button>
           </a>
           <Button
@@ -81,7 +81,7 @@ export function ReviewPageHeader({
             className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
           >
             <span className="mr-2 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">{applySelectedCount}</span>
-            Apply to WBS
+            WBS 반영
             <kbd className="ml-2 hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold opacity-90 sm:inline">
               ⌘↵
             </kbd>

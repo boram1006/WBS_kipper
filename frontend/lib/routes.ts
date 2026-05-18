@@ -1,5 +1,6 @@
-export function withProjectId(path: string, _projectId?: string | number) {
-  return path;
+export function withProjectId(path: string, projectId?: string | number) {
+  if (!projectId) return path;
+  return `${path}?id=${encodeURIComponent(String(projectId))}`;
 }
 
 export const routes = {
