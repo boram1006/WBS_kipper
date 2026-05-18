@@ -7,6 +7,5 @@ export const routes = {
   wbs: (projectId?: string | number) => withProjectId("/wbs", projectId),
   upload: (projectId?: string | number) => withProjectId("/upload", projectId),
   meetingNote: (projectId?: string | number) => withProjectId("/meeting-note", projectId),
-  review: (projectId?: string | number) => withProjectId("/review", projectId),
   history: (projectId?: string | number) => withProjectId("/history", projectId)
 };

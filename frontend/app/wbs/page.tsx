@@ -23,12 +23,13 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { ProjectSelector } from "@/components/project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { setActiveProjectId, useProjectIdFromQuery } from "@/lib/use-project-id";
+import { setActiveProjectId, useActiveProjectId } from "@/lib/use-project-id";
 import { loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
@@ -266,8 +267,16 @@ function formatShortDate(time: number) {
   return new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit" }).format(new Date(time));
 }
 
+function statusBucket(status: string) {
+  const text = status.toLowerCase();
+  if (text.includes("완료") || text.includes("done") || text.includes("complete")) return "completed";
+  if (text.includes("진행") || text.includes("progress")) return "progress";
+  if (text.includes("지연") || text.includes("delay") || text.includes("late")) return "delayed";
+  return "other";
+}
+
 export default function CurrentWbsPage() {
-  const projectId = useProjectIdFromQuery();
+  const [projectId, setProjectId] = useActiveProjectId();
   const router = useRouter();
   const [rows, setRows] = useState<WbsRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -337,13 +346,13 @@ export default function CurrentWbsPage() {
     });
   }, [changeTypeFilter, ownerFilter, query, recentOnly, rows, statusFilter]);
 
-  const activeRow = rows.find((row) => row.wbsId === activeId) ?? filteredRows[0] ?? null;
+  const activeRow = activeId ? rows.find((row) => row.wbsId === activeId) ?? null : null;
   const summary = useMemo(
     () => ({
       total: rows.length,
-      progress: rows.filter((row) => row.status === "진행").length,
-      completed: rows.filter((row) => row.status === "완료").length,
-      delayed: rows.filter((row) => row.status === "지연").length,
+      progress: rows.filter((row) => statusBucket(row.status) === "progress").length,
+      completed: rows.filter((row) => statusBucket(row.status) === "completed").length,
+      delayed: rows.filter((row) => statusBucket(row.status) === "delayed").length,
       recent: rows.filter((row) => row.badges.includes("recent")).length
     }),
     [rows]
@@ -385,20 +394,21 @@ export default function CurrentWbsPage() {
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
                 <span>/</span>
-                <span className="text-zinc-700">Current WBS</span>
+                <span className="text-zinc-700">WBS 현황</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-[-0.024em] text-zinc-950">
-                Current WBS
+                WBS 현황
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium text-zinc-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
-                  Latest approved project plan
+                  프로젝트별 최신 WBS
                 </span>
               </h1>
               <p className="mt-1 text-[13px] leading-[18px] tracking-[-0.01em] text-zinc-500">
-                View the latest WBS after approved meeting-based updates.
+                선택한 프로젝트에 저장된 WBS 일정과 작업 상태를 확인합니다.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ProjectSelector projectId={projectId} onChange={setProjectId} />
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={startDemo} disabled={demoLoading}>
                 <Play className="mr-1.5 h-3.5 w-3.5" />
                 {demoLoading ? "샘플 준비 중..." : "샘플 데이터로 시작하기"}
@@ -421,7 +431,7 @@ export default function CurrentWbsPage() {
           ) : rows.length === 0 ? (
             <EmptyState onImport={() => router.push(routes.upload(projectId))} />
           ) : (
-            <div className="grid grid-cols-[minmax(760px,1fr)_360px] gap-4">
+            <div className={cn("grid gap-4", activeRow ? "grid-cols-[minmax(760px,1fr)_360px]" : "grid-cols-1")}>
               <div className="min-w-0 space-y-4">
                 {error && (
                   <div className={cn("flex items-start gap-2 rounded-xl border px-4 py-3 text-[12px] leading-5", dataSource === "cache" ? "border-sky-200 bg-sky-50 text-sky-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
@@ -515,7 +525,7 @@ export default function CurrentWbsPage() {
                 </section>
               </div>
 
-              <TaskDrawer row={activeRow} onClose={() => setActiveId(null)} />
+              {activeRow && <TaskDrawer row={activeRow} onClose={() => setActiveId(null)} />}
             </div>
           )}
         </main>
@@ -548,7 +558,7 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <Calendar className="h-3.5 w-3.5 text-zinc-500" />
-            Current WBS Gantt
+            WBS 간트 차트
           </h2>
           <p className="mt-1 text-xs text-zinc-500">WBS Setting에 저장된 시작일과 마감일 기준 현재 일정입니다.</p>
         </div>

@@ -30,3 +30,18 @@ export function useProjectIdFromQuery() {
 
   return projectId;
 }
+
+export function useActiveProjectId() {
+  const [projectId, setProjectId] = useState(DEFAULT_PROJECT_ID);
+
+  useEffect(() => {
+    setProjectId(getActiveProjectId());
+  }, []);
+
+  function updateProjectId(nextProjectId: string | number) {
+    setActiveProjectId(nextProjectId);
+    setProjectId(String(nextProjectId));
+  }
+
+  return [projectId, updateProjectId] as const;
+}

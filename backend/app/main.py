@@ -57,6 +57,13 @@ def create_project(payload: ProjectCreateRequest) -> dict:
         return dict(row)
 
 
+@app.get("/api/projects")
+def list_projects() -> dict:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM projects ORDER BY id DESC").fetchall()
+        return {"projects": [dict(row) for row in rows]}
+
+
 @app.post("/api/demo/start")
 def start_demo() -> dict:
     root = Path(__file__).resolve().parents[2]

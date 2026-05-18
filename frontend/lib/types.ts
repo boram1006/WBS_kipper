@@ -10,6 +10,10 @@ export type ProjectResponse = {
   created_at: string;
 };
 
+export type ProjectsResponse = {
+  projects: ProjectResponse[];
+};
+
 export type WbsUploadResponse = {
   columns: string[];
   rows_preview: Record<string, string>[];

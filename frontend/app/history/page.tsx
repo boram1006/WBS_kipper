@@ -23,11 +23,12 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { ProjectSelector } from "@/components/project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { useProjectIdFromQuery } from "@/lib/use-project-id";
+import { useActiveProjectId } from "@/lib/use-project-id";
 import type { ChangeHistoryItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -154,7 +155,7 @@ function normalizeHistory(item: ChangeHistoryItem): HistoryRow {
 }
 
 export default function HistoryPage() {
-  const projectId = useProjectIdFromQuery();
+  const [projectId, setProjectId] = useActiveProjectId();
   const router = useRouter();
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -284,6 +285,7 @@ export default function HistoryPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} />
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={exportHistory}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Export History
@@ -300,7 +302,7 @@ export default function HistoryPage() {
           {loading ? (
             <LoadingState />
           ) : rows.length === 0 ? (
-            <EmptyState onReview={() => router.push(routes.review(projectId))} onImport={() => router.push(routes.upload(projectId))} />
+            <EmptyState onReview={() => router.push(routes.meetingNote(projectId))} onImport={() => router.push(routes.upload(projectId))} />
           ) : (
             <div className="grid grid-cols-[minmax(820px,1fr)_360px] gap-4">
               <div className="min-w-0 space-y-4">
@@ -611,10 +613,10 @@ function EmptyState({ onReview, onImport }: { onReview: () => void; onImport: ()
         <p className="mt-2 text-sm leading-6 text-zinc-500">Approved WBS updates will appear here with meeting evidence.</p>
         <div className="mt-5 flex justify-center gap-2">
           <Button className="rounded-lg bg-zinc-950 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onReview}>
-            Go to Update Review
+            Go to Meeting Input
           </Button>
           <Button variant="outline" className="rounded-lg text-xs" onClick={onImport}>
-            Import WBS
+            WBS Setting
           </Button>
         </div>
       </div>

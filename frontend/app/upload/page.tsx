@@ -19,12 +19,13 @@ import {
   Upload
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { ProjectSelector } from "@/components/project-selector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import { setActiveProjectId, useProjectIdFromQuery } from "@/lib/use-project-id";
+import { setActiveProjectId, useActiveProjectId } from "@/lib/use-project-id";
 import { loadWbsSnapshot, saveWbsSnapshot } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
@@ -224,7 +225,7 @@ function statusBadge(status: ValidationStatus) {
 }
 
 export default function WbsSetupPage() {
-  const projectId = useProjectIdFromQuery();
+  const [projectId, setProjectId] = useActiveProjectId();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -255,6 +256,10 @@ export default function WbsSetupPage() {
           setUploadedColumns([...STANDARD_COLUMN_KEYS]);
           setFileName("Saved WBS");
           saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
+        } else {
+          setRows([]);
+          setUploadedColumns([]);
+          setFileName(null);
         }
       } catch {
         if (!alive) return;
@@ -419,6 +424,7 @@ export default function WbsSetupPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ProjectSelector projectId={projectId} onChange={setProjectId} />
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadTemplate}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 템플릿 다운로드

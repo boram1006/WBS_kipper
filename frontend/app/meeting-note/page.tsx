@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +23,7 @@ import {
   Wand2
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { ProjectSelector } from "@/components/project-selector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,9 +31,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { changeTypeLabel, confidenceLabel, saveMeetingContext } from "@/components/review/review-utils";
 import { api } from "@/lib/api";
-import { routes } from "@/lib/routes";
 import type { WbsChangeCandidate } from "@/lib/types";
-import { useProjectIdFromQuery } from "@/lib/use-project-id";
+import { useActiveProjectId } from "@/lib/use-project-id";
 import { cn } from "@/lib/utils";
 
 const SAMPLE_NOTE = `주요 논의 사항
@@ -81,8 +80,7 @@ const toneClass: Record<string, string> = {
 };
 
 export default function MeetingNotePage() {
-  const projectId = useProjectIdFromQuery();
-  const router = useRouter();
+  const [projectId, setProjectId] = useActiveProjectId();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -231,6 +229,7 @@ export default function MeetingNotePage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} />
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm" type="button">
                 <History className="mr-1.5 h-3.5 w-3.5" />
                 이전 회의 불러오기
@@ -407,7 +406,6 @@ export default function MeetingNotePage() {
                 applying={applying}
                 onToggle={toggleCandidate}
                 onApply={() => void applySelected()}
-                onOpenFullReview={() => router.push(routes.review(projectId))}
               />
             </div>
 
@@ -476,8 +474,7 @@ function CandidateReviewPanel({
   selected,
   applying,
   onToggle,
-  onApply,
-  onOpenFullReview
+  onApply
 }: {
   analysisDone: boolean;
   candidates: WbsChangeCandidate[];
@@ -485,7 +482,6 @@ function CandidateReviewPanel({
   applying: boolean;
   onToggle: (candidateId: string, checked?: boolean) => void;
   onApply: () => void;
-  onOpenFullReview: () => void;
 }) {
   return (
     <Panel
@@ -494,9 +490,6 @@ function CandidateReviewPanel({
       description="AI가 추출한 변경 후보를 evidence와 before/after 기준으로 검토하세요. 승인한 항목만 WBS에 반영됩니다."
       action={
         <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]" onClick={onOpenFullReview}>
-            전체 검토 화면
-          </Button>
           <Button
             type="button"
             className="h-7 rounded-lg bg-zinc-950 px-2.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800"

@@ -7,6 +7,7 @@ import type {
   PendingChangesResponse,
   ProjectCreateRequest,
   ProjectResponse,
+  ProjectsResponse,
   WbsColumnMapping,
   WbsMapColumnsResponse,
   WbsUploadResponse
@@ -52,6 +53,8 @@ async function requestText(path: string, init?: RequestInit): Promise<string> {
 export const api = {
   createProject: (payload: ProjectCreateRequest) =>
     request<ProjectResponse>("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
+
+  getProjects: () => request<ProjectsResponse>("/api/projects"),
 
   startDemo: () => request<DemoStartResponse>("/api/demo/start", { method: "POST" }),
 
