@@ -65,6 +65,17 @@ const STANDARD_COLUMNS: StandardColumn[] = [
 ];
 
 const STANDARD_COLUMN_KEYS = STANDARD_COLUMNS.map((column) => column.key);
+const STANDARD_MAPPING = {
+  id: "wbs_id",
+  task_name: "task_name",
+  description: "description",
+  owner: "owner",
+  start_date: "start_date",
+  due_date: "due_date",
+  status: "status",
+  dependency: "dependency",
+  notes: "notes"
+};
 
 const SAMPLE_ROWS = [
   ["1.1", "요구사항 정리", "프로젝트 요구사항 초안 작성", "보람", "2026-05-13", "2026-05-17", "진행중", "", ""],
@@ -112,6 +123,11 @@ function buildTemplateCsv() {
 
 function csvFileFromRows(rows: WbsEditableRow[]) {
   return new File([`\uFEFF${rowsToCsv(rows)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
+}
+
+async function uploadAndMapStandardWbs(projectId: string, file: File) {
+  await api.uploadWbs(projectId, file);
+  await api.mapWbsColumns(projectId, STANDARD_MAPPING);
 }
 
 function parseCsv(text: string): string[][] {
@@ -300,7 +316,7 @@ export default function WbsSetupPage() {
       let targetProjectId = projectId;
       const file = csvFileFromRows(rows);
       try {
-        await api.uploadWbs(targetProjectId, file);
+        await uploadAndMapStandardWbs(targetProjectId, file);
       } catch (err) {
         const detail = err instanceof Error ? err.message : "";
         if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
@@ -310,7 +326,7 @@ export default function WbsSetupPage() {
         });
         targetProjectId = String(project.id);
         setActiveProjectId(targetProjectId);
-        await api.uploadWbs(targetProjectId, file);
+        await uploadAndMapStandardWbs(targetProjectId, file);
       }
       setMessage("WBS가 저장되었습니다.");
       router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
