@@ -53,15 +53,15 @@ const STATUS_OPTIONS = ["예정", "진행중", "완료", "지연", "보류"];
 const REQUIRED_FIELDS: Array<keyof WbsEditableRow> = ["wbs_id", "task_name", "due_date", "status"];
 
 const STANDARD_COLUMNS: StandardColumn[] = [
-  { key: "wbs_id", label: "WBS ID", required: true, description: "Stable task identifier" },
-  { key: "task_name", label: "Task name", required: true, description: "Work item title" },
-  { key: "description", label: "Description", required: false, description: "Short task context" },
-  { key: "owner", label: "Owner", required: false, description: "Person or team responsible" },
-  { key: "start_date", label: "Start date", required: false, description: "YYYY-MM-DD" },
-  { key: "due_date", label: "Due date", required: true, description: "YYYY-MM-DD" },
-  { key: "status", label: "Status", required: true, description: "Planned, in progress, done, held" },
-  { key: "dependency", label: "Dependency", required: false, description: "Preceding WBS ID" },
-  { key: "notes", label: "Notes", required: false, description: "Extra context for review" }
+  { key: "wbs_id", label: "WBS ID", required: true, description: "작업을 식별하는 고유 ID" },
+  { key: "task_name", label: "작업명", required: true, description: "WBS에 표시될 작업 이름" },
+  { key: "description", label: "설명", required: false, description: "작업의 간단한 설명" },
+  { key: "owner", label: "담당자", required: false, description: "담당자 또는 담당 팀" },
+  { key: "start_date", label: "시작일", required: false, description: "YYYY-MM-DD 형식" },
+  { key: "due_date", label: "마감일", required: true, description: "YYYY-MM-DD 형식" },
+  { key: "status", label: "상태", required: true, description: "예정, 진행중, 완료, 지연, 보류" },
+  { key: "dependency", label: "의존 작업", required: false, description: "선행 WBS ID" },
+  { key: "notes", label: "메모", required: false, description: "검토에 필요한 추가 정보" }
 ];
 
 const STANDARD_COLUMN_KEYS = STANDARD_COLUMNS.map((column) => column.key);
@@ -190,10 +190,10 @@ function validationFor(rows: WbsEditableRow[], uploadedColumns: string[]) {
 }
 
 function statusBadge(status: ValidationStatus) {
-  if (status === "valid") return { label: "Valid", variant: "success" as const };
-  if (status === "missing_required") return { label: "Missing Required Columns", variant: "danger" as const };
-  if (status === "needs_fix") return { label: "Needs Fix", variant: "warning" as const };
-  return { label: "Draft", variant: "outline" as const };
+  if (status === "valid") return { label: "저장 가능", variant: "success" as const };
+  if (status === "missing_required") return { label: "필수 컬럼 누락", variant: "danger" as const };
+  if (status === "needs_fix") return { label: "수정 필요", variant: "warning" as const };
+  return { label: "작성 전", variant: "outline" as const };
 }
 
 export default function WbsSetupPage() {
@@ -224,9 +224,9 @@ export default function WbsSetupPage() {
   function loadSample() {
     setRows(SAMPLE_ROWS.map(rowFromValues));
     setUploadedColumns([...STANDARD_COLUMN_KEYS]);
-    setFileName("Sample WBS");
+    setFileName("샘플 WBS");
     setError(null);
-    setMessage("Sample WBS loaded into the editable table. You can adjust rows before saving.");
+    setMessage("샘플 WBS가 편집 테이블에 채워졌습니다. 저장하기 전에 행을 수정할 수 있습니다.");
   }
 
   async function handleFile(selectedFile: File | null) {
@@ -238,7 +238,7 @@ export default function WbsSetupPage() {
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     if (extension !== "csv") {
       setUploadedColumns([]);
-      setError("Please upload the standard CSV template. Custom Excel layouts are not supported in the MVP.");
+      setError("표준 CSV 템플릿을 업로드해 주세요. MVP에서는 사용자 지정 엑셀 양식을 지원하지 않습니다.");
       return;
     }
 
@@ -248,22 +248,22 @@ export default function WbsSetupPage() {
       setRows(result.rows);
       const resultValidation = validationFor(result.rows, result.columns);
       if (resultValidation.missingRequiredColumns.length > 0) {
-        setError(`This file is missing required columns: ${resultValidation.missingRequiredColumns.join(", ")}.`);
+        setError(`필수 컬럼이 누락되었습니다: ${resultValidation.missingRequiredColumns.join(", ")}`);
       } else if (resultValidation.status === "needs_fix") {
-        setError("The file loaded into the editable table, but some rows need fixes before saving.");
+        setError("파일을 편집 테이블에 불러왔지만, 저장 전에 수정이 필요한 행이 있습니다.");
       } else {
-        setMessage("Template loaded into the editable table. Review or edit rows before saving.");
+        setMessage("템플릿을 편집 테이블에 불러왔습니다. 저장하기 전에 내용을 확인하거나 수정하세요.");
       }
     } catch {
       setUploadedColumns([]);
       setRows([]);
-      setError("We could not read this file. Please use the standard WBS CSV template.");
+      setError("파일을 읽을 수 없습니다. 표준 WBS CSV 템플릿을 사용해 주세요.");
     }
   }
 
   function addTask() {
     setRows((current) => [...current, emptyRow(current.length + 1)]);
-    setMessage("New task row added. Fill the required fields before saving.");
+    setMessage("새 작업 행을 추가했습니다. 저장하기 전에 필수값을 입력해 주세요.");
     setError(null);
   }
 
@@ -277,7 +277,7 @@ export default function WbsSetupPage() {
 
   async function saveWbs(continueToMeeting = false) {
     if (!canSave) {
-      setError("Fix required row fields before saving the WBS.");
+      setError("WBS를 저장하기 전에 필수값이 빠진 행을 수정해 주세요.");
       return;
     }
     setSaving(true);
@@ -292,17 +292,17 @@ export default function WbsSetupPage() {
         const detail = err instanceof Error ? err.message : "";
         if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
         const project = await api.createProject({
-          name: "WBS Setup Project",
-          description: "Created from the standard WBS setup table."
+          name: "WBS 설정 프로젝트",
+          description: "표준 WBS 설정 테이블에서 생성한 프로젝트입니다."
         });
         targetProjectId = String(project.id);
         setActiveProjectId(targetProjectId);
         await api.uploadWbs(targetProjectId, file);
       }
-      setMessage("WBS saved successfully.");
+      setMessage("WBS가 저장되었습니다.");
       router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save this WBS. Please try again.");
+      setError(err instanceof Error ? err.message : "WBS를 저장하지 못했습니다. 다시 시도해 주세요.");
     } finally {
       setSaving(false);
     }
@@ -318,26 +318,26 @@ export default function WbsSetupPage() {
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
                 <span>/</span>
-                <span className="text-zinc-700">WBS Setup</span>
+                <span className="text-zinc-700">WBS 설정</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-tight text-zinc-950">
-                WBS Setup
+                WBS 설정
                 <Badge variant={badge.variant} className="border border-current/10">
                   {badge.label}
                 </Badge>
               </h1>
               <p className="mt-1 text-[13px] leading-5 text-zinc-500">
-                Start with a standardized WBS template for reliable meeting-based updates.
+                회의록 기반 업데이트가 안정적으로 동작하도록 표준 WBS 형식으로 시작하세요.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadTemplate}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
-                Download Template
+                템플릿 다운로드
               </Button>
               <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={loadSample}>
                 <Play className="mr-1.5 h-3.5 w-3.5" />
-                Use Sample WBS
+                샘플 WBS 사용
               </Button>
             </div>
           </div>
@@ -361,30 +361,30 @@ export default function WbsSetupPage() {
           <section className="mt-5 grid gap-4 lg:grid-cols-3">
             <StartOption
               icon={Sparkles}
-              title="Use Sample WBS"
-              description="Load ready-made sample rows into the editable table."
+              title="샘플 WBS 사용"
+              description="준비된 샘플 행을 편집 테이블에 불러옵니다."
               action={
                 <Button className="h-9 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={loadSample}>
                   <Play className="mr-1.5 h-3.5 w-3.5" />
-                  Start with Sample WBS
+                  샘플 WBS로 시작
                 </Button>
               }
             />
             <StartOption
               icon={Download}
-              title="Download Template"
-              description="Download the standard WBS CSV template, fill it out, and upload it back."
+              title="템플릿 다운로드"
+              description="표준 WBS CSV 템플릿을 내려받아 작성한 뒤 다시 업로드할 수 있습니다."
               action={
                 <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadTemplate}>
                   <Download className="mr-1.5 h-3.5 w-3.5" />
-                  Download Template
+                  템플릿 다운로드
                 </Button>
               }
             />
             <StartOption
               icon={Upload}
-              title="Upload Standard Template"
-              description="Upload a WBS file created from the official template, then edit it here."
+              title="표준 템플릿 업로드"
+              description="공식 템플릿으로 작성한 WBS 파일을 업로드하고 화면에서 바로 수정합니다."
               action={
                 <div>
                   <input
@@ -400,8 +400,8 @@ export default function WbsSetupPage() {
                     className="flex min-h-[88px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 text-center text-[12.5px] font-medium text-zinc-600 hover:border-zinc-400 hover:bg-white"
                   >
                     <Upload className="mb-2 h-5 w-5 text-zinc-500" />
-                    {fileName ?? "Choose standard CSV template"}
-                    <span className="mt-1 text-[11px] font-normal text-zinc-400">CSV only for MVP</span>
+                    {fileName ?? "표준 CSV 템플릿 선택"}
+                    <span className="mt-1 text-[11px] font-normal text-zinc-400">MVP에서는 CSV만 지원</span>
                   </button>
                 </div>
               }
@@ -429,16 +429,16 @@ export default function WbsSetupPage() {
                 {canSave ? <Check className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
               </span>
               <span className="truncate">
-                {canSave ? "Editable WBS is valid. Save it or continue to Meeting Input." : "Add rows or fix required fields before saving."}
+                {canSave ? "편집한 WBS를 저장하거나 회의록 입력으로 이동할 수 있습니다." : "행을 추가하거나 필수값이 빠진 행을 수정해 주세요."}
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={() => void saveWbs(false)} disabled={!canSave || saving}>
                 <Table2 className="mr-1.5 h-3.5 w-3.5" />
-                Save WBS
+                WBS 저장
               </Button>
               <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={!canSave || saving}>
-                Continue to Meeting Input
+                회의록 입력으로 계속
                 <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             </div>
@@ -456,23 +456,23 @@ function StandardInfoCard() {
         <div className="max-w-3xl">
           <h2 className="flex items-center gap-2 text-base font-semibold text-zinc-950">
             <Info className="h-4 w-4 text-zinc-500" />
-            Use a standardized WBS format
+            표준 WBS 형식 사용
           </h2>
           <p className="mt-2 text-[13px] leading-6 text-zinc-500">
-            To keep meeting-based updates reliable, WBS Keeper uses a standard WBS template. Merged cells, multi-row
-            headers, and custom Excel formats are not supported in the MVP.
+            회의록 기반 업데이트의 정확도를 유지하기 위해 WBS Keeper는 표준 WBS 템플릿을 사용합니다.
+            MVP에서는 병합 셀, 여러 줄 헤더, 사용자 지정 엑셀 양식을 지원하지 않습니다.
           </p>
         </div>
         <Badge variant="outline" className="rounded-lg border-zinc-200 px-2.5 py-1 text-[11.5px]">
-          MVP template mode
+          MVP 표준 템플릿 모드
         </Badge>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         {[
-          "Standard columns are required",
-          "Merged cells are not supported",
-          "Custom Excel layouts will be supported later",
-          "You can edit rows directly in WBS Keeper"
+          "표준 컬럼이 필요합니다",
+          "병합 셀은 지원하지 않습니다",
+          "사용자 지정 엑셀 양식은 이후 지원 예정입니다",
+          "WBS Keeper 안에서 바로 행을 수정할 수 있습니다"
         ].map((item) => (
           <div key={item} className="flex items-start gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-[12px] font-medium text-zinc-700">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
@@ -530,25 +530,25 @@ function EditableWbsTable({
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <Table2 className="h-3.5 w-3.5 text-zinc-500" />
-            Editable WBS Table
+            WBS 직접 편집
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
-            Add, edit, or delete standard WBS rows without reopening Excel. Dependency can reference an existing WBS ID.
+            엑셀을 다시 열지 않고 표준 WBS 행을 추가, 수정, 삭제할 수 있습니다. 의존 작업에는 기존 WBS ID를 입력하세요.
           </p>
         </div>
         <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAdd}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Add Task
+          작업 추가
         </Button>
       </div>
 
       {rows.length === 0 ? (
         <div className="flex min-h-[260px] flex-col items-center justify-center px-6 text-center text-sm text-zinc-500">
           <Table2 className="mb-3 h-8 w-8 text-zinc-300" />
-          Start with sample rows, upload the standard template, or add a task manually.
+          샘플 행을 불러오거나 표준 템플릿을 업로드하거나 직접 작업을 추가하세요.
           <Button variant="outline" className="mt-4 h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={onAdd}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Add Task
+            작업 추가
           </Button>
         </div>
       ) : (
@@ -558,15 +558,15 @@ function EditableWbsTable({
               <tr className="border-b border-zinc-200">
                 <th className="w-10 px-3 py-3">#</th>
                 <th className="w-[96px] px-2 py-3">WBS ID*</th>
-                <th className="w-[180px] px-2 py-3">Task name*</th>
-                <th className="w-[230px] px-2 py-3">Description</th>
-                <th className="w-[130px] px-2 py-3">Owner</th>
-                <th className="w-[140px] px-2 py-3">Start date</th>
-                <th className="w-[140px] px-2 py-3">Due date*</th>
-                <th className="w-[110px] px-2 py-3">Status*</th>
-                <th className="w-[130px] px-2 py-3">Dependency</th>
-                <th className="w-[210px] px-2 py-3">Notes</th>
-                <th className="w-[100px] px-2 py-3">Validation</th>
+                <th className="w-[180px] px-2 py-3">작업명*</th>
+                <th className="w-[230px] px-2 py-3">설명</th>
+                <th className="w-[130px] px-2 py-3">담당자</th>
+                <th className="w-[140px] px-2 py-3">시작일</th>
+                <th className="w-[140px] px-2 py-3">마감일*</th>
+                <th className="w-[110px] px-2 py-3">상태*</th>
+                <th className="w-[130px] px-2 py-3">의존 작업</th>
+                <th className="w-[210px] px-2 py-3">메모</th>
+                <th className="w-[100px] px-2 py-3">검증</th>
                 <th className="w-12 px-2 py-3" />
               </tr>
             </thead>
@@ -604,7 +604,7 @@ function EditableWbsTable({
                           issue?.missing.includes("status") && "border-amber-400 bg-amber-50"
                         )}
                       >
-                        <option value="">Select</option>
+                        <option value="">선택</option>
                         {STATUS_OPTIONS.map((status) => (
                           <option key={status} value={status}>
                             {status}
@@ -613,7 +613,7 @@ function EditableWbsTable({
                       </select>
                     </td>
                     <td className="px-2 py-2">
-                      <CellInput value={row.dependency} placeholder="e.g. 1.1" onChange={(value) => onUpdate(row.clientId, "dependency", value)} />
+                      <CellInput value={row.dependency} placeholder="예: 1.1" onChange={(value) => onUpdate(row.clientId, "dependency", value)} />
                     </td>
                     <td className="px-2 py-2">
                       <CellInput value={row.notes} onChange={(value) => onUpdate(row.clientId, "notes", value)} />
@@ -621,11 +621,11 @@ function EditableWbsTable({
                     <td className="px-2 py-2">
                       {hasError ? (
                         <Badge variant="warning" className="border border-amber-200">
-                          Needs Fix
+                          수정 필요
                         </Badge>
                       ) : (
                         <Badge variant="success" className="border border-emerald-200">
-                          Valid
+                          정상
                         </Badge>
                       )}
                     </td>
@@ -634,7 +634,7 @@ function EditableWbsTable({
                         type="button"
                         onClick={() => onDelete(row.clientId)}
                         className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
-                        aria-label="Delete row"
+                        aria-label="행 삭제"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -681,11 +681,11 @@ function StandardColumnsCard() {
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <ClipboardList className="h-3.5 w-3.5 text-zinc-500" />
-            Standard column preview
+            표준 컬럼 미리보기
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">Only these columns are used for meeting-based WBS updates.</p>
+          <p className="mt-1 text-xs text-zinc-500">회의록 기반 WBS 업데이트에는 아래 표준 컬럼만 사용합니다.</p>
         </div>
-        <Badge variant="outline">{STANDARD_COLUMNS.length} columns</Badge>
+        <Badge variant="outline">{STANDARD_COLUMNS.length}개 컬럼</Badge>
       </div>
       <div className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
         {STANDARD_COLUMNS.map((column) => (
@@ -696,7 +696,7 @@ function StandardColumnsCard() {
                 <p className="mt-1 text-[11.5px] text-zinc-500">{column.description}</p>
               </div>
               <Badge variant={column.required ? "default" : "outline"} className={column.required ? "bg-zinc-950" : undefined}>
-                {column.required ? "Required" : "Optional"}
+                {column.required ? "필수" : "선택"}
               </Badge>
             </div>
           </div>
@@ -709,28 +709,28 @@ function StandardColumnsCard() {
 function ValidationCard({ validation, rowCount }: { validation: ReturnType<typeof validationFor>; rowCount: number }) {
   const checks = [
     {
-      label: "Required columns found",
+      label: "필수 컬럼 확인",
       detail: `${validation.requiredFound} / ${REQUIRED_FIELDS.length}`,
       ok: validation.missingRequiredColumns.length === 0
     },
     {
-      label: "Invalid date rows",
+      label: "날짜 형식 오류 행",
       detail: validation.invalidDateRows.length ? validation.invalidDateRows.join(", ") : "0",
       ok: validation.invalidDateRows.length === 0
     },
     {
-      label: "Rows missing required fields",
+      label: "필수값 누락 행",
       detail: validation.missingRequiredRows.length ? validation.missingRequiredRows.join(", ") : "0",
       ok: validation.missingRequiredRows.length === 0
     },
     {
-      label: "Unsupported columns ignored",
+      label: "무시되는 비표준 컬럼",
       detail: validation.unsupportedColumns.length ? validation.unsupportedColumns.join(", ") : "0",
       ok: true
     },
     {
-      label: "Ready to continue",
-      detail: rowCount ? `${rowCount} rows` : "No rows yet",
+      label: "저장 가능 상태",
+      detail: rowCount ? `${rowCount}개 행` : "아직 행 없음",
       ok: validation.status === "valid"
     }
   ];
@@ -742,9 +742,9 @@ function ValidationCard({ validation, rowCount }: { validation: ReturnType<typeo
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <CheckCircle2 className="h-3.5 w-3.5 text-zinc-500" />
-            Validation Summary
+            검증 요약
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">Fix row issues before saving the WBS.</p>
+          <p className="mt-1 text-xs text-zinc-500">WBS를 저장하기 전에 행별 오류를 수정하세요.</p>
         </div>
         <Badge variant={badge.variant} className="border border-current/10">
           {badge.label}
@@ -763,7 +763,7 @@ function ValidationCard({ validation, rowCount }: { validation: ReturnType<typeo
       </div>
       {validation.status === "needs_fix" && (
         <div className="border-t border-amber-100 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-800">
-          Required fields are WBS ID, task name, due date, and status. Dates must use YYYY-MM-DD.
+          필수값은 WBS ID, 작업명, 마감일, 상태입니다. 날짜는 YYYY-MM-DD 형식을 사용합니다.
         </div>
       )}
     </aside>
