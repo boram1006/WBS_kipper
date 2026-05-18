@@ -29,6 +29,7 @@ app = FastAPI(title="WBS Update Agent MVP")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.cors_origins.split(",")],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -155,6 +156,14 @@ def map_wbs_columns(project_id: int, payload: WbsMapColumnsRequest) -> dict:
                 (*[normalized[field] for field in WBS_FIELDS], row["id"]),
             )
         return {"mapping": payload.mapping.model_dump(), "saved": True}
+
+
+@app.get("/api/projects/{project_id}/wbs")
+def get_latest_wbs(project_id: int) -> dict:
+    with get_conn() as conn:
+        _ensure_project(conn, project_id)
+        rows = _get_wbs_rows(conn, project_id)
+        return {"columns": WBS_FIELDS, "rows_preview": rows, "total_rows": len(rows)}
 
 
 @app.post("/api/projects/{project_id}/meetings/analyze", response_model=MeetingAnalyzeResponse)

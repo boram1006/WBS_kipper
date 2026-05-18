@@ -12,10 +12,18 @@ import type {
   WbsUploadResponse
 } from "@/lib/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const CONFIGURED_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+function apiBase() {
+  if (CONFIGURED_API_BASE) return CONFIGURED_API_BASE;
+  if (typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    return "http://localhost:8000";
+  }
+  return "https://wbs-kipper-api.onrender.com";
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers: init?.body instanceof FormData ? init.headers : { "Content-Type": "application/json", ...init?.headers },
     cache: "no-store"
@@ -29,7 +37,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestText(path: string, init?: RequestInit): Promise<string> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     ...init,
     cache: "no-store"
   });
@@ -59,6 +67,8 @@ export const api = {
       body: JSON.stringify({ mapping })
     }),
 
+  getWbs: (projectId: string | number) => request<WbsUploadResponse>(`/api/projects/${projectId}/wbs`),
+
   analyzeMeeting: (projectId: string | number, payload: MeetingAnalyzeRequest) =>
     request<MeetingAnalyzeResponse>(`/api/projects/${projectId}/meetings/analyze`, {
       method: "POST",
@@ -78,5 +88,5 @@ export const api = {
 
   downloadWbsCsvText: (projectId: string | number) => requestText(`/api/projects/${projectId}/wbs/download`),
 
-  downloadWbsUrl: (projectId: string | number) => `${API_BASE}/api/projects/${projectId}/wbs/download`
+  downloadWbsUrl: (projectId: string | number) => `${apiBase()}/api/projects/${projectId}/wbs/download`
 };

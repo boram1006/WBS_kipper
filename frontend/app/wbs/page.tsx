@@ -251,6 +251,21 @@ function rowsFromCsv(csv: string): WbsRow[] {
   return normalizeRawRows(rawRows);
 }
 
+function toTime(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function ganttRange(rows: WbsRow[]) {
+  const times = rows.flatMap((row) => [toTime(row.startDate), toTime(row.dueDate)]).filter((time): time is number => time != null);
+  if (!times.length) return null;
+  return { min: Math.min(...times), max: Math.max(...times) };
+}
+
+function formatShortDate(time: number) {
+  return new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit" }).format(new Date(time));
+}
+
 export default function CurrentWbsPage() {
   const projectId = useProjectIdFromQuery();
   const router = useRouter();
@@ -273,12 +288,13 @@ export default function CurrentWbsPage() {
       setError(null);
       try {
         if (!projectId) throw new Error("프로젝트 ID가 없습니다.");
-        const csv = await api.downloadWbsCsvText(projectId);
-        const parsed = rowsFromCsv(csv);
+        const snapshot = await api.getWbs(projectId);
+        const parsed = normalizeRawRows(snapshot.rows_preview);
         if (!alive) return;
         setRows(parsed);
         setActiveId(parsed[0]?.wbsId ?? null);
         setDataSource("api");
+        saveWbsSnapshot(projectId, snapshot);
       } catch (err) {
         if (!alive) return;
         const cached = loadWbsSnapshot(projectId);
@@ -289,10 +305,10 @@ export default function CurrentWbsPage() {
           setDataSource("cache");
           setError("서버에서 최신 WBS를 불러오지 못해 이 브라우저에 저장된 WBS를 표시합니다.");
         } else {
-          setRows(MOCK_ROWS);
-          setActiveId(MOCK_ROWS[1]?.wbsId ?? MOCK_ROWS[0]?.wbsId ?? null);
-          setDataSource("mock");
-          setError(err instanceof Error ? err.message : "최신 WBS를 불러오지 못해 샘플 데이터를 표시합니다.");
+          setRows([]);
+          setActiveId(null);
+          setDataSource("api");
+          setError(err instanceof Error ? err.message : "저장된 WBS를 불러오지 못했습니다. WBS Setting에서 먼저 저장해 주세요.");
         }
       } finally {
         if (alive) setLoading(false);
@@ -393,7 +409,7 @@ export default function CurrentWbsPage() {
               </Button>
               <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => router.push(routes.upload(projectId))}>
                 <GitBranch className="mr-1.5 h-3.5 w-3.5" />
-                Import New WBS
+                WBS Setting
               </Button>
             </div>
           </div>
@@ -421,6 +437,8 @@ export default function CurrentWbsPage() {
                   <SummaryCard icon={AlertCircle} label="Delayed" value={summary.delayed} />
                   <SummaryCard icon={Sparkles} label="Recently Updated" value={summary.recent} accent />
                 </section>
+
+                <GanttChart rows={filteredRows} />
 
                 <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-3">
@@ -517,6 +535,67 @@ function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; l
       </div>
       <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">{label}</p>
     </div>
+  );
+}
+
+function GanttChart({ rows }: { rows: WbsRow[] }) {
+  const range = ganttRange(rows);
+  const span = range ? Math.max(range.max - range.min, 24 * 60 * 60 * 1000) : 1;
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+            <Calendar className="h-3.5 w-3.5 text-zinc-500" />
+            Current WBS Gantt
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">WBS Setting에 저장된 시작일과 마감일 기준 현재 일정입니다.</p>
+        </div>
+        {range && (
+          <span className="text-[11px] font-medium text-zinc-400">
+            {formatShortDate(range.min)} - {formatShortDate(range.max)}
+          </span>
+        )}
+      </div>
+      {!range ? (
+        <div className="px-6 py-10 text-center text-sm text-zinc-500">시작일과 마감일이 있는 WBS를 저장하면 간트 차트가 표시됩니다.</div>
+      ) : (
+        <div className="max-h-[320px] overflow-auto px-4 py-3">
+          <div className="mb-2 grid grid-cols-[180px_1fr_90px] gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400">
+            <span>Task</span>
+            <div className="flex justify-between">
+              <span>{formatShortDate(range.min)}</span>
+              <span>{formatShortDate(range.max)}</span>
+            </div>
+            <span>Status</span>
+          </div>
+          <div className="space-y-2">
+            {rows.map((row) => {
+              const start = toTime(row.startDate) ?? range.min;
+              const due = toTime(row.dueDate) ?? start;
+              const left = Math.max(0, Math.min(100, ((start - range.min) / span) * 100));
+              const width = Math.max(3, Math.min(100 - left, ((Math.max(due, start) - start) / span) * 100));
+              return (
+                <div key={row.wbsId} className="grid grid-cols-[180px_1fr_90px] items-center gap-3 text-[12px]">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
+                    <p className="font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
+                  </div>
+                  <div className="relative h-8 rounded-lg bg-zinc-100">
+                    <div
+                      className={cn("absolute top-1/2 h-3 -translate-y-1/2 rounded-full", row.status.includes("완료") ? "bg-emerald-500" : row.status.includes("보류") ? "bg-orange-400" : "bg-zinc-900")}
+                      style={{ left: `${left}%`, width: `${width}%` }}
+                    />
+                  </div>
+                  <span className={cn("truncate rounded-md border px-2 py-1 text-center text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -682,9 +761,9 @@ function EmptyState({ onImport }: { onImport: () => void }) {
           <FileDown className="h-5 w-5" />
         </div>
         <h2 className="mt-4 text-lg font-semibold text-zinc-950">No WBS data yet</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-500">Import a WBS file to start tracking project updates.</p>
+        <p className="mt-2 text-sm leading-6 text-zinc-500">WBS Setting에서 WBS를 저장하면 현재 일정이 표시됩니다.</p>
         <Button className="mt-5 rounded-lg bg-zinc-950 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onImport}>
-          Import WBS
+          WBS Setting
         </Button>
       </div>
     </div>

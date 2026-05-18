@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { setActiveProjectId, useProjectIdFromQuery } from "@/lib/use-project-id";
-import { saveWbsSnapshot } from "@/lib/wbs-cache";
+import { loadWbsSnapshot, saveWbsSnapshot } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type StandardColumn = {
@@ -176,6 +176,10 @@ function normalizeUploadedRows(text: string) {
   return { columns, rows: dataRows };
 }
 
+function editableRowsFromRaw(rawRows: Record<string, string>[]) {
+  return rawRows.map((raw) => rowFromValues(STANDARD_COLUMN_KEYS.map((key) => String(raw[key] ?? ""))));
+}
+
 function isIsoDate(value: string) {
   if (!value) return true;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -194,6 +198,7 @@ function rowErrors(row: WbsEditableRow) {
 }
 
 function validationFor(rows: WbsEditableRow[], uploadedColumns: string[]) {
+  const hasRows = rows.length > 0;
   const missingRequiredColumns = uploadedColumns.length
     ? REQUIRED_FIELDS.filter((field) => !uploadedColumns.includes(field))
     : [];
@@ -201,14 +206,14 @@ function validationFor(rows: WbsEditableRow[], uploadedColumns: string[]) {
   const rowIssues = rows.map((row, index) => ({ rowIndex: index + 1, ...rowErrors(row) }));
   const invalidDateRows = rowIssues.filter((issue) => issue.invalidDates.length > 0).map((issue) => issue.rowIndex);
   const missingRequiredRows = rowIssues.filter((issue) => issue.missing.length > 0).map((issue) => issue.rowIndex);
-  const requiredFound = uploadedColumns.length ? REQUIRED_FIELDS.length - missingRequiredColumns.length : REQUIRED_FIELDS.length;
+  const requiredFound = hasRows ? REQUIRED_FIELDS.length - missingRequiredColumns.length : 0;
 
   let status: ValidationStatus = "valid";
   if (rows.length === 0) status = "empty";
   else if (missingRequiredColumns.length > 0) status = "missing_required";
   else if (invalidDateRows.length > 0 || missingRequiredRows.length > 0) status = "needs_fix";
 
-  return { status, missingRequiredColumns, unsupportedColumns, rowIssues, invalidDateRows, missingRequiredRows, requiredFound };
+  return { status, missingRequiredColumns, unsupportedColumns, rowIssues, invalidDateRows, missingRequiredRows, requiredFound, hasRows };
 }
 
 function statusBadge(status: ValidationStatus) {
@@ -228,10 +233,47 @@ export default function WbsSetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(true);
 
   const validation = useMemo(() => validationFor(rows, uploadedColumns), [rows, uploadedColumns]);
   const badge = statusBadge(validation.status);
   const canSave = rows.length > 0 && validation.status === "valid";
+
+  useEffect(() => {
+    let alive = true;
+    async function loadExistingWbs() {
+      if (!projectId) {
+        setLoadingExisting(false);
+        return;
+      }
+      setLoadingExisting(true);
+      try {
+        const snapshot = await api.getWbs(projectId);
+        if (!alive) return;
+        if (snapshot.rows_preview.length > 0) {
+          setRows(editableRowsFromRaw(snapshot.rows_preview));
+          setUploadedColumns([...STANDARD_COLUMN_KEYS]);
+          setFileName("Saved WBS");
+          saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
+        }
+      } catch {
+        if (!alive) return;
+        const cached = loadWbsSnapshot(projectId);
+        if (cached?.rows_preview?.length) {
+          setRows(editableRowsFromRaw(cached.rows_preview));
+          setUploadedColumns([...STANDARD_COLUMN_KEYS]);
+          setFileName("Saved WBS");
+          setMessage("서버 WBS를 바로 불러오지 못해 브라우저에 저장된 WBS를 표시했습니다.");
+        }
+      } finally {
+        if (alive) setLoadingExisting(false);
+      }
+    }
+    void loadExistingWbs();
+    return () => {
+      alive = false;
+    };
+  }, [projectId]);
 
   function downloadTemplate() {
     const blob = new Blob([`\uFEFF${buildTemplateCsv()}`], { type: "text/csv;charset=utf-8" });
@@ -249,6 +291,14 @@ export default function WbsSetupPage() {
     setFileName("샘플 WBS");
     setError(null);
     setMessage("샘플 WBS가 편집 테이블에 채워졌습니다. 저장하기 전에 행을 수정할 수 있습니다.");
+  }
+
+  function clearWbs() {
+    setRows([]);
+    setUploadedColumns([]);
+    setFileName(null);
+    setError(null);
+    setMessage("새 WBS를 처음부터 작성할 수 있습니다. 저장 전까지 서버 데이터는 바뀌지 않습니다.");
   }
 
   async function handleFile(selectedFile: File | null) {
@@ -377,6 +427,9 @@ export default function WbsSetupPage() {
                 <Play className="mr-1.5 h-3.5 w-3.5" />
                 샘플 WBS 사용
               </Button>
+              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={clearWbs}>
+                새 WBS
+              </Button>
             </div>
           </div>
         </header>
@@ -391,6 +444,12 @@ export default function WbsSetupPage() {
             >
               {error ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
               <span>{error ?? message}</span>
+            </div>
+          )}
+
+          {loadingExisting && (
+            <div className="mb-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-[12.5px] text-zinc-500">
+              저장된 WBS를 불러오는 중입니다...
             </div>
           )}
 
@@ -749,17 +808,17 @@ function ValidationCard({ validation, rowCount }: { validation: ReturnType<typeo
     {
       label: "필수 컬럼 확인",
       detail: `${validation.requiredFound} / ${REQUIRED_FIELDS.length}`,
-      ok: validation.missingRequiredColumns.length === 0
+      ok: validation.hasRows && validation.missingRequiredColumns.length === 0
     },
     {
       label: "날짜 형식 오류 행",
       detail: validation.invalidDateRows.length ? validation.invalidDateRows.join(", ") : "0",
-      ok: validation.invalidDateRows.length === 0
+      ok: validation.hasRows && validation.invalidDateRows.length === 0
     },
     {
       label: "필수값 누락 행",
       detail: validation.missingRequiredRows.length ? validation.missingRequiredRows.join(", ") : "0",
-      ok: validation.missingRequiredRows.length === 0
+      ok: validation.hasRows && validation.missingRequiredRows.length === 0
     },
     {
       label: "무시되는 비표준 컬럼",
