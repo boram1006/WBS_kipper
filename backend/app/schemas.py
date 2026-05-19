@@ -45,6 +45,8 @@ class MeetingAnalyzeRequest(BaseModel):
     meeting_date: str = Field(min_length=1)
     meeting_title: str = Field(min_length=1)
     meeting_note: str = Field(min_length=10)
+    enabled_detection: dict[str, bool] | None = None
+    auto_match: bool = True
 
 
 class MeetingAnalysisSummary(BaseModel):

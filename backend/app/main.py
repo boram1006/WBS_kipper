@@ -200,6 +200,8 @@ def analyze_meeting(project_id: int, payload: MeetingAnalyzeRequest) -> dict:
             payload.meeting_title,
             payload.meeting_note,
             current_rows,
+            enabled_detection=payload.enabled_detection,
+            auto_match=payload.auto_match,
         )
         meeting_id = conn.execute(
             """

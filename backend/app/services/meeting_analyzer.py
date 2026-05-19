@@ -32,22 +32,52 @@ SUMMARY_KEYS = [
     "clarification_needed",
 ]
 
+DETECTION_TO_CHANGE_TYPES = {
+    "new_tasks": {"new_task"},
+    "schedule_changes": {"schedule_change"},
+    "owner_changes": {"owner_change"},
+    "status_changes": {"status_change"},
+    "dependency_changes": {"dependency_change", "hold_or_drop"},
+    "risks": {"risk"},
+    "clarification_needed": {"clarification_needed", "decision"},
+}
+
 
 def analyze_meeting_note(
     meeting_date: str,
     meeting_title: str,
     meeting_note: str,
     current_wbs_rows: list[dict[str, str]],
+    enabled_detection: dict[str, bool] | None = None,
+    auto_match: bool = True,
 ) -> dict[str, Any]:
+    allowed_change_types = _allowed_change_types(enabled_detection)
     if not settings.mock_analysis and settings.openai_api_key:
         try:
             return _normalize_analysis(
-                _analyze_with_openai(meeting_date, meeting_title, meeting_note, current_wbs_rows),
+                _analyze_with_openai(
+                    meeting_date,
+                    meeting_title,
+                    meeting_note,
+                    current_wbs_rows,
+                    enabled_detection,
+                    allowed_change_types,
+                    auto_match,
+                ),
                 current_wbs_rows,
+                allowed_change_types,
+                auto_match,
             )
         except Exception:
             pass
-    return _analyze_with_rules(meeting_date, meeting_title, meeting_note, current_wbs_rows)
+    return _analyze_with_rules(
+        meeting_date,
+        meeting_title,
+        meeting_note,
+        current_wbs_rows,
+        allowed_change_types,
+        auto_match,
+    )
 
 
 def _analyze_with_openai(
@@ -55,6 +85,9 @@ def _analyze_with_openai(
     meeting_title: str,
     meeting_note: str,
     current_wbs_rows: list[dict[str, str]],
+    enabled_detection: dict[str, bool] | None,
+    allowed_change_types: set[str],
+    auto_match: bool,
 ) -> dict[str, Any]:
     from openai import OpenAI
 
@@ -64,9 +97,15 @@ def _analyze_with_openai(
         "meeting_title": meeting_title,
         "meeting_note": meeting_note,
         "current_wbs_rows": current_wbs_rows[:120],
+        "enabled_detection": enabled_detection or {key: True for key in DETECTION_TO_CHANGE_TYPES},
+        "allowed_change_types": sorted(allowed_change_types),
+        "auto_match": auto_match,
         "output_schema": _schema_description(),
         "rules": [
             "Extract only actionable WBS update candidates. Do not summarize the meeting note line by line.",
+            "Only return changes whose change_type is included in allowed_change_types.",
+            "If allowed_change_types does not include risk, return an empty risks array.",
+            "If auto_match is false, set matched_wbs_id=null and current_value=null for every change.",
             "Do not create candidates for headings, section labels, background context, alternatives, or descriptive discussion.",
             "Ignore lines such as '주요 논의 사항', numbered headings, '[필수]', '[옵션]', '기존:', and '개선:' unless they contain a concrete action owner/date/status update.",
             "A valid candidate must represent one of: new work item, owner assignment, due date/schedule change, status change, dependency/scope change, risk/blocker, or explicit follow-up/confirmation action.",
@@ -130,6 +169,8 @@ def _analyze_with_rules(
     meeting_title: str,
     meeting_note: str,
     current_wbs_rows: list[dict[str, str]],
+    allowed_change_types: set[str],
+    auto_match: bool,
 ) -> dict[str, Any]:
     sentences = _split_sentences(meeting_note)
     changes: list[dict[str, Any]] = []
@@ -139,7 +180,7 @@ def _analyze_with_rules(
     for index, sentence in enumerate(sentences, start=1):
         if _is_noise_sentence(sentence):
             continue
-        match = _match_wbs(sentence, current_wbs_rows)
+        match = _match_wbs(sentence, current_wbs_rows) if auto_match else None
         matched_id = match.get("wbs_id") if match else None
         task_name = match.get("task_name") if match else _extract_task_name(sentence)
         confidence: Confidence = "high" if match else "low"
@@ -314,15 +355,21 @@ def _analyze_with_rules(
             )
 
     existing_task_names = {str(change.get("task_name") or "") for change in changes}
-    for action in _extract_korean_action_items(meeting_note, start_index=len(changes) + 1):
-        if action["task_name"] not in existing_task_names:
-            changes.append(action)
-            existing_task_names.add(action["task_name"])
+    if "new_task" in allowed_change_types:
+        for action in _extract_korean_action_items(meeting_note, start_index=len(changes) + 1):
+            if action["task_name"] not in existing_task_names:
+                changes.append(action)
+                existing_task_names.add(action["task_name"])
 
-    return _normalize_analysis({"summary": {}, "changes": changes, "risks": risks}, current_wbs_rows)
+    return _normalize_analysis({"summary": {}, "changes": changes, "risks": risks}, current_wbs_rows, allowed_change_types, auto_match)
 
 
-def _normalize_analysis(raw: dict[str, Any], current_wbs_rows: list[dict[str, str]]) -> dict[str, Any]:
+def _normalize_analysis(
+    raw: dict[str, Any],
+    current_wbs_rows: list[dict[str, str]],
+    allowed_change_types: set[str] | None = None,
+    auto_match: bool = True,
+) -> dict[str, Any]:
     changes = [
         change
         for idx, item in enumerate(raw.get("changes", []), start=1)
@@ -330,8 +377,27 @@ def _normalize_analysis(raw: dict[str, Any], current_wbs_rows: list[dict[str, st
         for change in [_normalize_change(item, idx)]
         if not _is_noise_change(change)
     ]
+    if allowed_change_types is not None:
+        changes = [change for change in changes if change["change_type"] in allowed_change_types]
+    if not auto_match:
+        changes = [{**change, "matched_wbs_id": None, "current_value": None} for change in changes]
+
     risks = [_normalize_risk(item, idx) for idx, item in enumerate(raw.get("risks", []), start=1) if isinstance(item, dict)]
+    if allowed_change_types is not None and "risk" not in allowed_change_types:
+        risks = []
+    if not auto_match:
+        risks = [{**risk, "related_wbs_id": None} for risk in risks]
     return {"summary": _build_summary(changes, risks), "changes": changes, "risks": risks}
+
+
+def _allowed_change_types(enabled_detection: dict[str, bool] | None) -> set[str]:
+    if enabled_detection is None:
+        return set(_change_types())
+    allowed: set[str] = set()
+    for key, change_types in DETECTION_TO_CHANGE_TYPES.items():
+        if enabled_detection.get(key, True):
+            allowed.update(change_types)
+    return allowed
 
 
 def _normalize_change(item: dict[str, Any], index: int) -> dict[str, Any]:

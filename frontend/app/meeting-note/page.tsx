@@ -199,7 +199,9 @@ export default function MeetingNotePage() {
       const analysis = await api.analyzeMeeting(projectId, {
         meeting_date: values.meeting_date,
         meeting_title: values.meeting_title,
-        meeting_note: values.meeting_note
+        meeting_note: values.meeting_note,
+        enabled_detection: enabledDetection,
+        auto_match: autoMatch
       });
       const pending = await api.getPendingChanges(projectId);
       const changes = dedupeCandidates(pending.changes.length ? pending.changes : analysis.changes);

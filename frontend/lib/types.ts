@@ -45,6 +45,8 @@ export type MeetingAnalyzeRequest = {
   meeting_date: string;
   meeting_title: string;
   meeting_note: string;
+  enabled_detection?: Record<string, boolean>;
+  auto_match?: boolean;
 };
 
 export type WbsChangeCandidate = {
