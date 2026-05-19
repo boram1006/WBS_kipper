@@ -14,12 +14,29 @@ type Props = {
   preferDefaultProject?: boolean;
 };
 
+function projectLabel(project: ProjectResponse) {
+  return project.name?.trim() || "webOS UX";
+}
+
+function uniqueProjectsByName(projects: ProjectResponse[], selectedProjectId: string) {
+  const byName = new Map<string, ProjectResponse>();
+  for (const project of projects) {
+    const label = projectLabel(project);
+    const existing = byName.get(label);
+    if (!existing || String(project.id) === selectedProjectId) {
+      byName.set(label, project);
+    }
+  }
+  return Array.from(byName.values());
+}
+
 export function ProjectSelector({ projectId, onChange, allowCreate = true, preferDefaultProject = false }: Props) {
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(false);
   const defaultApplied = useRef(false);
+  const visibleProjects = uniqueProjectsByName(projects, projectId);
 
   useEffect(() => {
     let alive = true;
@@ -69,10 +86,10 @@ export function ProjectSelector({ projectId, onChange, allowCreate = true, prefe
         onChange={(event) => onChange(event.target.value)}
         className="h-8 min-w-[220px] rounded-lg border border-zinc-200 bg-white px-3 text-[12.5px] font-medium text-zinc-800 outline-none focus:border-zinc-400"
       >
-        {!projects.some((project) => String(project.id) === projectId) && <option value={projectId}>webOS UX</option>}
-        {projects.map((project) => (
+        {!visibleProjects.some((project) => String(project.id) === projectId) && <option value={projectId}>webOS UX</option>}
+        {visibleProjects.map((project) => (
           <option key={project.id} value={project.id}>
-            {project.name || "webOS UX"}
+            {projectLabel(project)}
           </option>
         ))}
       </select>

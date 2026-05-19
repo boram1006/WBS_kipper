@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   Download,
   FileText,
@@ -236,10 +237,13 @@ export default function WbsSetupPage() {
   const [saving, setSaving] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
   const [isCreatingNewWbs, setIsCreatingNewWbs] = useState(false);
+  const [newWbsName, setNewWbsName] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
 
   const validation = useMemo(() => validationFor(rows, uploadedColumns), [rows, uploadedColumns]);
   const badge = statusBadge(validation.status);
   const canSave = rows.length > 0 && validation.status === "valid";
+  const canSaveNewWbs = canSave && newWbsName.trim().length > 0;
 
   useEffect(() => {
     let alive = true;
@@ -257,12 +261,14 @@ export default function WbsSetupPage() {
           setUploadedColumns([...STANDARD_COLUMN_KEYS]);
           setFileName("Saved WBS");
           setIsCreatingNewWbs(false);
+          setNewWbsName("");
           saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
         } else {
           setRows([]);
           setUploadedColumns([]);
           setFileName(null);
           setIsCreatingNewWbs(true);
+          setNewWbsName("");
         }
       } catch {
         if (!alive) return;
@@ -272,12 +278,14 @@ export default function WbsSetupPage() {
           setUploadedColumns([...STANDARD_COLUMN_KEYS]);
           setFileName("Saved WBS");
           setIsCreatingNewWbs(false);
+          setNewWbsName("");
           setMessage("서버 WBS를 바로 불러오지 못해 브라우저에 저장된 WBS를 표시했습니다.");
         } else {
           setRows([]);
           setUploadedColumns([]);
           setFileName(null);
           setIsCreatingNewWbs(true);
+          setNewWbsName("");
         }
       } finally {
         if (alive) setLoadingExisting(false);
@@ -287,7 +295,7 @@ export default function WbsSetupPage() {
     return () => {
       alive = false;
     };
-  }, [projectId]);
+  }, [projectId, reloadToken]);
 
   function downloadTemplate() {
     const blob = new Blob([`\uFEFF${buildTemplateCsv()}`], { type: "text/csv;charset=utf-8" });
@@ -304,7 +312,7 @@ export default function WbsSetupPage() {
     setUploadedColumns([...STANDARD_COLUMN_KEYS]);
     setFileName("샘플 WBS");
     setError(null);
-    setIsCreatingNewWbs(false);
+    setIsCreatingNewWbs(true);
     setMessage("샘플 WBS가 편집 테이블에 채워졌습니다. 저장하기 전에 행을 수정할 수 있습니다.");
   }
 
@@ -313,8 +321,20 @@ export default function WbsSetupPage() {
     setUploadedColumns([]);
     setFileName(null);
     setError(null);
+    setNewWbsName("");
     setIsCreatingNewWbs(true);
     setMessage("새 WBS를 처음부터 작성할 수 있습니다. 저장 전까지 서버 데이터는 바뀌지 않습니다.");
+  }
+
+  function cancelNewWbs() {
+    setIsCreatingNewWbs(false);
+    setRows([]);
+    setUploadedColumns([]);
+    setFileName(null);
+    setNewWbsName("");
+    setError(null);
+    setMessage(null);
+    setReloadToken((current) => current + 1);
   }
 
   async function handleFile(selectedFile: File | null) {
@@ -334,7 +354,7 @@ export default function WbsSetupPage() {
       const result = normalizeUploadedRows(await selectedFile.text());
       setUploadedColumns(result.columns);
       setRows(result.rows);
-      setIsCreatingNewWbs(false);
+      setIsCreatingNewWbs(true);
       const resultValidation = validationFor(result.rows, result.columns);
       if (resultValidation.missingRequiredColumns.length > 0) {
         setError(`필수 컬럼이 누락되었습니다: ${resultValidation.missingRequiredColumns.join(", ")}`);
@@ -365,6 +385,10 @@ export default function WbsSetupPage() {
   }
 
   async function saveWbs(continueToMeeting = false) {
+    if (isCreatingNewWbs && !newWbsName.trim()) {
+      setError("새 WBS 이름을 입력해 주세요.");
+      return;
+    }
     if (!canSave) {
       if (rows.length === 0) {
         setError("저장할 WBS 행이 없습니다. 작업 추가를 누르거나 샘플 WBS를 불러와 주세요.");
@@ -389,22 +413,33 @@ export default function WbsSetupPage() {
       let targetProjectId = projectId;
       let snapshot;
       const file = csvFileFromRows(rows);
-      try {
-        snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : "";
-        if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
+      if (isCreatingNewWbs) {
         const project = await api.createProject({
-          name: "webOS UX",
-          description: "Default WBS project."
+          name: newWbsName.trim(),
+          description: "Created from WBS Setting."
         });
         targetProjectId = String(project.id);
         setActiveProjectId(targetProjectId);
         snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
+      } else {
+        try {
+          snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : "";
+          if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
+          const project = await api.createProject({
+            name: "webOS UX",
+            description: "Default WBS project."
+          });
+          targetProjectId = String(project.id);
+          setActiveProjectId(targetProjectId);
+          snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
+        }
       }
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
       setIsCreatingNewWbs(false);
+      setNewWbsName("");
       setMessage("WBS가 저장되었습니다.");
       router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {
@@ -423,24 +458,31 @@ export default function WbsSetupPage() {
             <div>
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
-                <span>/</span>
-                <span className="text-zinc-700">WBS 설정</span>
+                <ChevronRight className="h-3 w-3" />
+                <button type="button" className="hover:text-zinc-700" onClick={cancelNewWbs}>
+                  WBS 설정
+                </button>
+                {isCreatingNewWbs && (
+                  <>
+                    <ChevronRight className="h-3 w-3" />
+                    <span className="text-zinc-700">새 WBS</span>
+                  </>
+                )}
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-tight text-zinc-950">
-                WBS 설정
+                {isCreatingNewWbs ? "새 WBS" : "WBS 설정"}
                 <Badge variant={badge.variant} className="border border-current/10">
                   {badge.label}
                 </Badge>
               </h1>
               <p className="mt-1 text-[13px] leading-5 text-zinc-500">
-                회의록 기반 업데이트가 안정적으로 동작하도록 표준 WBS 형식으로 시작하세요.
+                {isCreatingNewWbs ? "새 WBS 이름을 정하고 표준 형식으로 작업 행을 작성하세요." : "회의록 기반 업데이트가 안정적으로 동작하도록 표준 WBS 형식으로 시작하세요."}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} preferDefaultProject />
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={clearWbs}>
+              {!isCreatingNewWbs && <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={clearWbs}>
                 새 WBS
-              </Button>
+              </Button>}
             </div>
           </div>
         </header>
@@ -462,6 +504,20 @@ export default function WbsSetupPage() {
             <div className="mb-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-[12.5px] text-zinc-500">
               저장된 WBS를 불러오는 중입니다...
             </div>
+          )}
+          {isCreatingNewWbs && (
+            <section className="mb-5 rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <label className="text-xs font-semibold text-zinc-700" htmlFor="new-wbs-name">
+                WBS 이름
+              </label>
+              <Input
+                id="new-wbs-name"
+                value={newWbsName}
+                onChange={(event) => setNewWbsName(event.target.value)}
+                placeholder="예: webOS US"
+                className="mt-2 h-9 max-w-[420px] rounded-lg border-zinc-200 text-sm shadow-none"
+              />
+            </section>
           )}
           {isCreatingNewWbs && (
             <>
@@ -518,6 +574,16 @@ export default function WbsSetupPage() {
             </>
           )}
 
+          {!isCreatingNewWbs && (
+            <section className="mt-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div>
+                <p className="text-xs font-semibold text-zinc-700">WBS 선택</p>
+                <p className="mt-0.5 text-[11.5px] text-zinc-500">편집할 WBS를 선택하세요.</p>
+              </div>
+              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} preferDefaultProject />
+            </section>
+          )}
+
           <EditableWbsTable
             rows={rows}
             validation={validation}
@@ -540,18 +606,31 @@ export default function WbsSetupPage() {
                 {canSave ? <Check className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
               </span>
               <span className="truncate">
-                {canSave ? "편집한 WBS를 저장하거나 회의록 입력으로 이동할 수 있습니다." : "행을 추가하거나 필수값이 빠진 행을 수정해 주세요."}
+                {isCreatingNewWbs
+                  ? canSaveNewWbs
+                    ? "새 WBS를 저장할 수 있습니다."
+                    : "WBS 이름과 필수값이 빠진 행을 확인해 주세요."
+                  : canSave
+                    ? "편집한 WBS를 저장할 수 있습니다."
+                    : "행을 추가하거나 필수값이 빠진 행을 수정해 주세요."}
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {isCreatingNewWbs && (
+                <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={cancelNewWbs} disabled={saving}>
+                  취소
+                </Button>
+              )}
               <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={() => void saveWbs(false)} disabled={saving}>
                 <Table2 className="mr-1.5 h-3.5 w-3.5" />
-                WBS 저장
+                {isCreatingNewWbs ? "새 WBS 저장" : "WBS 저장"}
               </Button>
-              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={saving}>
-                회의록 입력으로 계속
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
+              {!isCreatingNewWbs && (
+                <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={saving}>
+                  회의록 입력으로 계속
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
