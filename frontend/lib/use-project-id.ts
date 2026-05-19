@@ -16,7 +16,7 @@ export function getActiveProjectId() {
 }
 
 export function useProjectIdFromQuery() {
-  const [projectId, setProjectId] = useState(DEFAULT_PROJECT_ID);
+  const [projectId, setProjectId] = useState(() => getActiveProjectId());
 
   useEffect(() => {
     const idFromUrl = new URLSearchParams(window.location.search).get("id");
@@ -32,11 +32,7 @@ export function useProjectIdFromQuery() {
 }
 
 export function useActiveProjectId() {
-  const [projectId, setProjectId] = useState(DEFAULT_PROJECT_ID);
-
-  useEffect(() => {
-    setProjectId(getActiveProjectId());
-  }, []);
+  const [projectId, setProjectId] = useState(() => getActiveProjectId());
 
   function updateProjectId(nextProjectId: string | number) {
     setActiveProjectId(nextProjectId);

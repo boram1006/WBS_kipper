@@ -5,14 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
-  ArrowRight,
   Calendar,
   CheckCircle2,
   Clock3,
   Download,
   FileDown,
   GitBranch,
-  History,
   Info,
 
   Search,
@@ -43,14 +41,8 @@ type WbsRow = {
   status: string;
   dependency: string;
   lastUpdated: string;
-  sourceMeeting: string;
   badges: WbsBadge[];
-  latestUpdate: string;
-  before: string;
-  after: string;
-  evidence: string;
-  relatedHistory: string[];
-  dependentTasks: string[];
+  notes: string;
 };
 
 type WbsBadge = "recent" | "new" | "schedule" | "owner" | "status" | "confirm";
@@ -127,21 +119,15 @@ function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnap
     return {
       wbsId,
       taskName,
-      description: mappedValue(raw, mapping?.description, ["description", "설명"], "업로드된 WBS row입니다."),
+      description: mappedValue(raw, mapping?.description, ["description", "설명"], ""),
       owner: mappedValue(raw, mapping?.owner, ["owner", "담당자", "assignee"], "미정"),
       startDate: mappedValue(raw, mapping?.start_date, ["start_date", "start date", "시작일"], "-"),
       dueDate: mappedValue(raw, mapping?.due_date, ["due_date", "due date", "마감", "마감일"], "-"),
       status: mappedValue(raw, mapping?.status, ["status", "상태"], "예정"),
       dependency: mappedValue(raw, mapping?.dependency, ["dependency", "depends on", "의존성"], "-"),
       lastUpdated: firstValue(raw, ["updated_at", "last updated"], "-"),
-      sourceMeeting: firstValue(raw, ["source meeting", "meeting"], "-"),
       badges: [],
-      latestUpdate: "업로드된 최신 WBS 데이터입니다.",
-      before: "-",
-      after: "-",
-      evidence: mappedValue(raw, mapping?.notes, ["notes", "비고"], "업로드된 WBS 원본 row에서 가져왔습니다."),
-      relatedHistory: [],
-      dependentTasks: []
+      notes: mappedValue(raw, mapping?.notes, ["notes", "비고"], "")
     };
   });
 }
@@ -194,7 +180,16 @@ export default function CurrentWbsPage() {
   useEffect(() => {
     let alive = true;
     async function load() {
-      setLoading(true);
+      const cached = loadWbsSnapshot(projectId);
+      if (cached?.rows_preview?.length) {
+        setRows(normalizeRawRows(cached.rows_preview, cached.mapping));
+        setActiveId(null);
+        setDataSource("cache");
+        setError(null);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       try {
         if (!projectId) throw new Error("프로젝트 ID가 없습니다.");
@@ -207,7 +202,6 @@ export default function CurrentWbsPage() {
         saveWbsSnapshot(projectId, snapshot);
       } catch (err) {
         if (!alive) return;
-        const cached = loadWbsSnapshot(projectId);
         if (cached?.rows_preview?.length) {
           const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping);
           setRows(cachedRows);
@@ -238,7 +232,7 @@ export default function CurrentWbsPage() {
     return rows.filter((row) => {
       const matchesQuery =
         !needle ||
-        [row.wbsId, row.taskName, row.owner, row.description, row.sourceMeeting].some((value) => value.toLowerCase().includes(needle));
+        [row.wbsId, row.taskName, row.owner, row.description, row.notes].some((value) => value.toLowerCase().includes(needle));
       const matchesStatus = statusFilter === "all" || row.status === statusFilter;
       const matchesOwner = ownerFilter === "all" || row.owner === ownerFilter;
       const matchesRecent = !recentOnly || row.badges.includes("recent");
@@ -258,6 +252,28 @@ export default function CurrentWbsPage() {
     }),
     [rows]
   );
+  const activeSummaryFilter =
+    statusFilter === "all" && !recentOnly
+      ? "total"
+      : recentOnly
+        ? "recent"
+        : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "progress")
+          ? "progress"
+          : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "completed")
+            ? "completed"
+            : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "delayed")
+              ? "delayed"
+              : null;
+
+  function applySummaryFilter(filter: "total" | "progress" | "completed" | "delayed" | "recent") {
+    setRecentOnly(filter === "recent");
+    if (filter === "total" || filter === "recent") {
+      setStatusFilter("all");
+      return;
+    }
+    const matchingStatus = statusOptions.find((status) => status !== "all" && statusBucket(status) === filter);
+    setStatusFilter(matchingStatus ?? "all");
+  }
 
   function downloadCsv() {
     if (!projectId) return;
@@ -313,11 +329,11 @@ export default function CurrentWbsPage() {
                 )}
 
                 <section className="grid grid-cols-5 gap-3">
-                  <SummaryCard icon={Table2} label="Total Tasks" value={summary.total} />
-                  <SummaryCard icon={Clock3} label="In Progress" value={summary.progress} />
-                  <SummaryCard icon={CheckCircle2} label="Completed" value={summary.completed} />
-                  <SummaryCard icon={AlertCircle} label="Delayed" value={summary.delayed} />
-                  <SummaryCard icon={Sparkles} label="Recently Updated" value={summary.recent} accent />
+                  <SummaryCard icon={Table2} label="Total Tasks" value={summary.total} tone="neutral" active={activeSummaryFilter === "total"} onClick={() => applySummaryFilter("total")} />
+                  <SummaryCard icon={Clock3} label="In Progress" value={summary.progress} tone="progress" active={activeSummaryFilter === "progress"} onClick={() => applySummaryFilter("progress")} />
+                  <SummaryCard icon={CheckCircle2} label="Completed" value={summary.completed} tone="completed" active={activeSummaryFilter === "completed"} onClick={() => applySummaryFilter("completed")} />
+                  <SummaryCard icon={AlertCircle} label="Delayed" value={summary.delayed} tone="delayed" active={activeSummaryFilter === "delayed"} onClick={() => applySummaryFilter("delayed")} />
+                  <SummaryCard icon={Sparkles} label="Recently Updated" value={summary.recent} tone="recent" active={activeSummaryFilter === "recent"} onClick={() => applySummaryFilter("recent")} />
                 </section>
 
                 <GanttChart rows={filteredRows} />
@@ -360,7 +376,6 @@ export default function CurrentWbsPage() {
                           <Th>Status</Th>
                           <Th>Dependency</Th>
                           <Th>Last updated</Th>
-                          <Th>Source meeting</Th>
                         </tr>
                       </thead>
                       <tbody>
@@ -387,7 +402,6 @@ export default function CurrentWbsPage() {
                             </Td>
                             <Td>{row.dependency}</Td>
                             <Td>{row.lastUpdated}</Td>
-                            <Td className="max-w-[150px] truncate text-zinc-500">{row.sourceMeeting}</Td>
                           </tr>
                         ))}
                       </tbody>
@@ -406,17 +420,45 @@ export default function CurrentWbsPage() {
   );
 }
 
-function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; label: string; value: number; accent?: boolean }) {
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+  active,
+  onClick
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  tone: "neutral" | "progress" | "completed" | "delayed" | "recent";
+  active?: boolean;
+  onClick: () => void;
+}) {
+  const toneClass = {
+    neutral: "border-zinc-200 bg-zinc-50 text-zinc-600",
+    progress: "border-sky-200 bg-sky-50 text-sky-700",
+    completed: "border-zinc-300 bg-zinc-100 text-zinc-600",
+    delayed: "border-rose-200 bg-rose-50 text-rose-700",
+    recent: "border-violet-200 bg-violet-50 text-violet-700"
+  }[tone];
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-xl border bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-zinc-300 hover:bg-zinc-50",
+        active ? "border-zinc-950 ring-1 ring-zinc-950" : "border-zinc-200"
+      )}
+    >
       <div className="flex items-center justify-between">
-        <span className={cn("grid h-7 w-7 place-items-center rounded-lg border", accent ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-zinc-200 bg-zinc-50 text-zinc-600")}>
+        <span className={cn("grid h-7 w-7 place-items-center rounded-lg border", toneClass)}>
           <Icon className="h-3.5 w-3.5" />
         </span>
         <span className="text-[22px] font-semibold tracking-[-0.03em] text-zinc-950">{value}</span>
       </div>
       <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">{label}</p>
-    </div>
+    </button>
   );
 }
 
@@ -513,57 +555,30 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
 
       <div className="min-h-0 flex-1 space-y-5 overflow-auto px-4 py-4">
         <section>
-          <div className="mb-2 flex flex-wrap gap-1">
+          <h3 className="text-lg font-semibold leading-6 tracking-tight text-zinc-950">{row.taskName}</h3>
+          {row.description ? <p className="mt-1 text-[12.5px] leading-5 text-zinc-500">{row.description}</p> : null}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
             {row.badges.map((badge) => (
               <StatusBadge key={badge} badge={badge} />
             ))}
           </div>
-          <h3 className="text-lg font-semibold leading-6 tracking-tight text-zinc-950">{row.taskName}</h3>
-          <p className="mt-1 text-[12.5px] leading-5 text-zinc-500">{row.description}</p>
         </section>
 
         <section className="grid grid-cols-2 gap-2 text-[12px]">
+          <DetailItem label="Task ID" value={row.wbsId} icon={Table2} />
           <DetailItem label="Owner" value={row.owner} icon={UserRound} />
-          <DetailItem label="Status" value={row.status} icon={CheckCircle2} />
           <DetailItem label="Start date" value={row.startDate} icon={Calendar} />
           <DetailItem label="Due date" value={row.dueDate} icon={Calendar} />
           <DetailItem label="Dependency" value={row.dependency} icon={GitBranch} />
-          <DetailItem label="Source meeting" value={row.sourceMeeting} icon={History} />
+          <DetailItem label="Last updated" value={row.lastUpdated} icon={Clock3} />
         </section>
 
-        <DrawerSection title="Latest update">
-          <p className="text-[12.5px] leading-5 text-zinc-700">{row.latestUpdate}</p>
-        </DrawerSection>
-
-        <DrawerSection title="Before / After">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[12.5px]">
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-500 line-through decoration-zinc-300">{row.before}</div>
-            <ArrowRight className="h-4 w-4 text-zinc-400" />
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">{row.after}</div>
-          </div>
-        </DrawerSection>
-
-        <DrawerSection title="Evidence from meeting note">
-          <blockquote className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12.5px] leading-5 text-zinc-700">“{row.evidence}”</blockquote>
-        </DrawerSection>
-
-        <DrawerSection title="Related change history">
-          <div className="space-y-2">
-            {(row.relatedHistory.length ? row.relatedHistory : ["변경 이력이 아직 없습니다."]).map((item) => (
-              <div key={item} className="rounded-lg border border-zinc-200 px-3 py-2 text-[12px] text-zinc-600">{item}</div>
-            ))}
-          </div>
-        </DrawerSection>
-
-        <DrawerSection title="Dependent tasks">
-          <div className="flex flex-wrap gap-1.5">
-            {(row.dependentTasks.length ? row.dependentTasks : ["연결된 후속 작업 없음"]).map((task) => (
-              <span key={task} className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11.5px] font-medium text-zinc-600">
-                {task}
-              </span>
-            ))}
-          </div>
-        </DrawerSection>
+        {row.notes && (
+          <DrawerSection title="Notes">
+            <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12.5px] leading-5 text-zinc-700">{row.notes}</p>
+          </DrawerSection>
+        )}
       </div>
     </aside>
   );
@@ -629,7 +644,7 @@ function Td({ children, className }: { children: ReactNode; className?: string }
 
 function statusClass(status: string) {
   const bucket = statusBucket(status);
-  if (bucket === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (bucket === "completed") return "border-zinc-300 bg-zinc-100 text-zinc-600";
   if (bucket === "progress") return "border-sky-200 bg-sky-50 text-sky-800";
   if (bucket === "delayed") return "border-rose-200 bg-rose-50 text-rose-800";
   if (status.includes("보류") || status.includes("제외") || status.toLowerCase().includes("hold")) return "border-orange-200 bg-orange-50 text-orange-800";
@@ -639,7 +654,7 @@ function statusClass(status: string) {
 
 function ganttBarClass(status: string) {
   const bucket = statusBucket(status);
-  if (bucket === "completed") return "bg-emerald-500";
+  if (bucket === "completed") return "bg-zinc-400";
   if (bucket === "progress") return "bg-sky-500";
   if (bucket === "delayed") return "bg-rose-500";
   if (status.includes("보류") || status.includes("제외") || status.toLowerCase().includes("hold")) return "bg-orange-400";
