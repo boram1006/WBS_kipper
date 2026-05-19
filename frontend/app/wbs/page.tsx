@@ -422,7 +422,13 @@ function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; l
 
 function GanttChart({ rows }: { rows: WbsRow[] }) {
   const range = ganttRange(rows);
-  const span = range ? Math.max(range.max - range.min, 24 * 60 * 60 * 1000) : 1;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTime = today.getTime();
+  const min = range ? Math.min(range.min, todayTime) : todayTime;
+  const max = range ? Math.max(range.max, todayTime) : todayTime;
+  const span = Math.max(max - min, 24 * 60 * 60 * 1000);
+  const todayLeft = Math.max(0, Math.min(100, ((todayTime - min) / span) * 100));
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -432,11 +438,11 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
             <Calendar className="h-3.5 w-3.5 text-zinc-500" />
             WBS 간트 차트
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">WBS Setting에 저장된 시작일과 마감일 기준 현재 일정입니다.</p>
+          <p className="mt-1 text-xs text-zinc-500">빨간 기준선은 오늘 날짜입니다.</p>
         </div>
         {range && (
           <span className="text-[11px] font-medium text-zinc-400">
-            {formatShortDate(range.min)} - {formatShortDate(range.max)}
+            {formatShortDate(min)} - {formatShortDate(max)}
           </span>
         )}
       </div>
@@ -446,17 +452,20 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
         <div className="max-h-[320px] overflow-auto px-4 py-3">
           <div className="mb-2 grid grid-cols-[180px_1fr_90px] gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400">
             <span>Task</span>
-            <div className="flex justify-between">
-              <span>{formatShortDate(range.min)}</span>
-              <span>{formatShortDate(range.max)}</span>
+            <div className="relative flex justify-between">
+              <span>{formatShortDate(min)}</span>
+              <span className="absolute -top-0.5 -translate-x-1/2 text-[#fd312e]" style={{ left: `${todayLeft}%` }}>
+                Today
+              </span>
+              <span>{formatShortDate(max)}</span>
             </div>
             <span>Status</span>
           </div>
           <div className="space-y-2">
             {rows.map((row) => {
-              const start = toTime(row.startDate) ?? range.min;
+              const start = toTime(row.startDate) ?? min;
               const due = toTime(row.dueDate) ?? start;
-              const left = Math.max(0, Math.min(100, ((start - range.min) / span) * 100));
+              const left = Math.max(0, Math.min(100, ((start - min) / span) * 100));
               const width = Math.max(3, Math.min(100 - left, ((Math.max(due, start) - start) / span) * 100));
               return (
                 <div key={row.wbsId} className="grid grid-cols-[180px_1fr_90px] items-center gap-3 text-[12px]">
@@ -465,6 +474,10 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
                     <p className="font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
                   </div>
                   <div className="relative h-8 rounded-lg bg-zinc-100">
+                    <div
+                      className="absolute bottom-0 top-0 z-10 w-px bg-[#fd312e]"
+                      style={{ left: `${todayLeft}%` }}
+                    />
                     <div
                       className={cn("absolute top-1/2 h-3 -translate-y-1/2 rounded-full", ganttBarClass(row.status))}
                       style={{ left: `${left}%`, width: `${width}%` }}

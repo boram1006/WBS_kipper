@@ -76,6 +76,30 @@ const toneClass: Record<string, string> = {
   zinc: "border-zinc-200 bg-zinc-50 text-zinc-800"
 };
 
+const CANDIDATE_STATUS_OPTIONS = ["예정", "진행중", "완료", "지연", "보류"];
+
+function candidateKey(candidate: WbsChangeCandidate) {
+  return [
+    candidate.change_type,
+    candidate.matched_wbs_id || "new",
+    candidate.task_name.trim().toLowerCase(),
+    candidate.field || "",
+    candidate.current_value || "",
+    candidate.proposed_value || "",
+    candidate.evidence.trim().toLowerCase()
+  ].join("|");
+}
+
+function dedupeCandidates(candidates: WbsChangeCandidate[]) {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = candidateKey(candidate);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export default function MeetingNotePage() {
   const [projectId, setProjectId] = useActiveProjectId();
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +140,7 @@ export default function MeetingNotePage() {
   }, [note]);
 
   const pendingCandidates = useMemo(
-    () => reviewCandidates.filter((candidate) => candidate.status === "pending"),
+    () => dedupeCandidates(reviewCandidates.filter((candidate) => candidate.status === "pending")),
     [reviewCandidates]
   );
   const selectedCandidates = pendingCandidates.filter((candidate) => selected.has(candidate.id));
@@ -178,7 +202,7 @@ export default function MeetingNotePage() {
         meeting_note: values.meeting_note
       });
       const pending = await api.getPendingChanges(projectId);
-      const changes = pending.changes.length ? pending.changes : analysis.changes;
+      const changes = dedupeCandidates(pending.changes.length ? pending.changes : analysis.changes);
       setReviewCandidates(changes);
       setSelected(new Set(changes.filter((candidate) => candidate.confidence !== "low").map((candidate) => candidate.id)));
       setAnalysisDone(true);
@@ -404,6 +428,7 @@ export default function MeetingNotePage() {
                 onToggle={toggleCandidate}
                 onUpdate={updateCandidate}
                 onApply={() => void applySelected()}
+                selectedCount={selectedCandidates.length}
                 wbsRows={currentWbsRows}
               />
             </div>
@@ -460,6 +485,7 @@ function CandidateReviewPanel({
   onToggle,
   onUpdate,
   onApply,
+  selectedCount,
   wbsRows
 }: {
   analysisDone: boolean;
@@ -469,6 +495,7 @@ function CandidateReviewPanel({
   onToggle: (candidateId: string, checked?: boolean) => void;
   onUpdate: (candidateId: string, patch: Partial<WbsChangeCandidate>) => void;
   onApply: () => void;
+  selectedCount: number;
   wbsRows: WbsRowRecord[];
 }) {
   const rowMap = useMemo(() => new Map(wbsRows.map((row) => [row.wbs_id, row])), [wbsRows]);
@@ -478,18 +505,6 @@ function CandidateReviewPanel({
       step="4"
       title="WBS 업데이트 후보"
       description="AI가 추출한 변경 후보를 evidence와 before/after 기준으로 검토하세요. 승인한 항목만 WBS에 반영됩니다."
-      action={
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            className="h-7 rounded-lg bg-zinc-950 px-2.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800"
-            disabled={selected.size === 0 || applying}
-            onClick={onApply}
-          >
-            {applying ? "반영 중..." : `${selected.size}건 WBS에 반영`}
-          </Button>
-        </div>
-      }
     >
       {!analysisDone ? (
         <div className="flex min-h-[180px] items-center justify-center border-t border-zinc-100 px-6 py-10 text-center">
@@ -504,6 +519,7 @@ function CandidateReviewPanel({
       ) : candidates.length === 0 ? (
         <div className="px-6 py-8 text-center text-sm text-zinc-500">승인 대기 중인 WBS 업데이트 후보가 없습니다.</div>
       ) : (
+        <>
         <div className="divide-y divide-zinc-100">
           {candidates.map((candidate) => {
             const checked = selected.has(candidate.id);
@@ -561,7 +577,7 @@ function CandidateReviewPanel({
                         <CandidateInput label="담당자" value={candidate.proposed_owner || ""} onChange={(value) => onUpdate(candidate.id, { proposed_owner: value })} />
                         <CandidateInput label="시작일" type="date" value={candidate.proposed_start_date || ""} onChange={(value) => onUpdate(candidate.id, { proposed_start_date: value })} />
                         <CandidateInput label="종료일" type="date" value={candidate.proposed_due_date || ""} onChange={(value) => onUpdate(candidate.id, { proposed_due_date: value })} />
-                        <CandidateInput label="상태" value={candidate.proposed_status || "예정"} onChange={(value) => onUpdate(candidate.id, { proposed_status: value })} />
+                        <CandidateStatusSelect value={candidate.proposed_status || "예정"} onChange={(value) => onUpdate(candidate.id, { proposed_status: value })} />
                         <CandidateInput label="의존 작업" value={candidate.proposed_dependency || ""} onChange={(value) => onUpdate(candidate.id, { proposed_dependency: value })} />
                         <CandidateInput label="설명" value={candidate.proposed_description || candidate.reason || ""} onChange={(value) => onUpdate(candidate.id, { proposed_description: value })} className="md:col-span-2" />
                       </span>
@@ -582,6 +598,17 @@ function CandidateReviewPanel({
             );
           })}
         </div>
+        <div className="flex justify-end border-t border-zinc-100 bg-zinc-50 px-4 py-3">
+          <Button
+            type="button"
+            className="h-9 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
+            disabled={selectedCount === 0 || applying}
+            onClick={onApply}
+          >
+            {applying ? "반영 중..." : `${selectedCount}건 WBS 반영`}
+          </Button>
+        </div>
+        </>
       )}
     </Panel>
   );
@@ -593,6 +620,25 @@ function Detail({ label, value }: { label: string; value: string }) {
       <span className="block text-[10.5px] font-semibold text-zinc-400">{label}</span>
       <span className="mt-0.5 block truncate font-medium text-zinc-700">{value}</span>
     </span>
+  );
+}
+
+function CandidateStatusSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[10.5px] font-semibold text-zinc-500">상태</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12px] font-medium text-zinc-800 outline-none focus:border-zinc-400"
+      >
+        {CANDIDATE_STATUS_OPTIONS.map((status) => (
+          <option key={status} value={status}>
+            {status}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
