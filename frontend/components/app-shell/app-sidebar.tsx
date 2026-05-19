@@ -61,16 +61,16 @@ export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
         <div>
           <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">WBS Workflow</p>
           <div className="space-y-0.5">
-            <NavItem href={routes.wbs(projectId)} icon={Table2} label="Current WBS" active={pathname === "/wbs"} />
-            <NavItem href={routes.meetingNote(projectId)} icon={Mic} label="Meeting Input" active={pathname === "/meeting-note"} />
-            <NavItem href={routes.history(projectId)} icon={History} label="Change History" active={pathname === "/history"} />
+            <NavItem href={routes.wbs(projectId)} icon={Table2} label="WBS 현황" active={pathname === "/wbs"} />
+            <NavItem href={routes.meetingNote(projectId)} icon={Mic} label="회의록 분석" active={pathname === "/meeting-note"} />
+            <NavItem href={routes.history(projectId)} icon={History} label="변경 이력" active={pathname === "/history"} />
           </div>
         </div>
 
         <div>
           <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">Project</p>
           <div className="space-y-0.5">
-            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="WBS Setting" active={pathname === "/upload"} />
+            <NavItem href={routes.upload(projectId)} icon={GitBranch} label="WBS 설정" active={pathname === "/upload"} />
           </div>
         </div>
       </nav>

@@ -48,7 +48,7 @@ export function ReviewApplyBar({
 
         <p className="hidden min-w-0 items-center gap-1.5 truncate text-[11.5px] text-zinc-500 xl:flex">
           <Info className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-          승인된 항목만 WBS에 반영되며, 모든 결정은 Change History에 기록됩니다.
+          승인된 항목만 WBS에 반영되며, 모든 결정은 변경 이력에 기록됩니다.
         </p>
 
         <div className="flex shrink-0 items-center gap-2">

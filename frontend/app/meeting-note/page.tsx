@@ -149,7 +149,7 @@ export default function MeetingNotePage() {
     { label: "프로젝트 선택", ready: Boolean(projectId), detail: projectId ? "webOS UX" : "-" },
     { label: "회의 날짜 선택", ready: Boolean(meetingDate), detail: meetingDate || "-" },
     { label: "회의 제목 입력", ready: Boolean(meetingTitle.trim()), detail: meetingTitle.trim() || "-" },
-    { label: "회의록 입력", ready: noteStats.chars >= 10, detail: `${noteStats.chars}자` }
+    { label: "회의록 분석", ready: noteStats.chars >= 10, detail: `${noteStats.chars}자` }
   ];
   const readyCount = readiness.filter((item) => item.ready).length;
   const canAnalyze = Boolean(projectId && meetingDate && meetingTitle.trim() && noteStats.chars >= 10);
@@ -259,10 +259,10 @@ export default function MeetingNotePage() {
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
                 <span>/</span>
-                <span className="text-zinc-700">회의록 입력</span>
+                <span className="text-zinc-700">회의록 분석</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-[-0.024em] text-zinc-950">
-                회의록 입력
+                회의록 분석
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium tracking-[-0.01em] text-zinc-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
                   업데이트 검토 포함
@@ -329,7 +329,7 @@ export default function MeetingNotePage() {
                   </button>
                 }
               >
-                <div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-4">
                   {detectionItems.map((item) => {
                     const Icon = item.icon;
                     const checked = enabledDetection[item.key];

@@ -66,7 +66,7 @@ export function ReviewPageHeader({
           <Link href={routes.meetingNote(projectId)}>
             <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm">
               <History className="mr-1.5 h-3.5 w-3.5" />
-              회의록 입력
+              회의록 분석
             </Button>
           </Link>
           <a href={api.downloadWbsUrl(projectId)}>

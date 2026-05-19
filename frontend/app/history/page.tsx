@@ -9,8 +9,6 @@ import {
   Calendar,
   CheckCircle2,
   Clipboard,
-  Download,
-  FileDown,
   GitBranch,
   History,
   Info,
@@ -149,33 +147,6 @@ export default function HistoryPage() {
     [rows]
   );
 
-  function exportHistory() {
-    const csv = [
-      ["changed_at", "change_type", "wbs_id", "task_name", "field", "before", "after", "confidence", "applied_by", "evidence"],
-      ...filteredRows.map((row) => [
-        row.changedAt,
-        row.changeType,
-        row.wbsId,
-        row.taskName,
-        row.field,
-        row.before,
-        row.after,
-        row.confidence,
-        row.appliedBy,
-        row.evidence
-      ])
-    ]
-      .map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "change-history.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
       <AppSidebar projectId={projectId} pendingCount={8} />
@@ -186,29 +157,21 @@ export default function HistoryPage() {
               <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
                 <span>WBS Keeper</span>
                 <span>/</span>
-                <span className="text-zinc-700">Change History</span>
+                <span className="text-zinc-700">변경 이력</span>
               </nav>
               <h1 className="flex flex-wrap items-center gap-3 text-[22px] font-semibold leading-7 tracking-[-0.024em] text-zinc-950">
-                Change History
+                변경 이력
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11.5px] font-medium text-zinc-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#fd312e]" />
-                  Audit trail
+                  반영 기록
                 </span>
               </h1>
               <p className="mt-1 text-[13px] leading-[18px] tracking-[-0.01em] text-zinc-500">
-                Track approved WBS changes with meeting evidence and before/after values.
+                회의록 분석에서 승인되어 WBS에 반영된 변경 내역을 확인합니다.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} />
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={exportHistory}>
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-                Export History
-              </Button>
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={() => (window.location.href = api.downloadWbsUrl(projectId))}>
-                <FileDown className="mr-1.5 h-3.5 w-3.5" />
-                Download Current WBS
-              </Button>
             </div>
           </div>
         </header>
@@ -296,7 +259,7 @@ export default function HistoryPage() {
                 </section>
               </div>
 
-              {activeRow && <HistoryDrawer row={activeRow} projectId={projectId} onClose={() => setActiveId(null)} />}
+              {activeRow && <HistoryDrawer row={activeRow} onClose={() => setActiveId(null)} />}
             </div>
           )}
         </main>
@@ -330,20 +293,8 @@ function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; l
   );
 }
 
-function HistoryDrawer({ row, projectId, onClose }: { row: HistoryRow; projectId: string; onClose: () => void }) {
-  const router = useRouter();
+function HistoryDrawer({ row, onClose }: { row: HistoryRow; onClose: () => void }) {
   const current = row;
-
-  function exportOne() {
-    const payload = JSON.stringify(current, null, 2);
-    const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `change-${current.id}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -387,16 +338,6 @@ function HistoryDrawer({ row, projectId, onClose }: { row: HistoryRow; projectId
           <blockquote className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12.5px] leading-5 text-zinc-700">“{row.evidence}”</blockquote>
         </DrawerSection>
 
-        <div className="grid gap-2">
-          <Button className="h-9 rounded-lg bg-zinc-950 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => router.push(routes.wbs(projectId))}>
-            <Table2 className="mr-1.5 h-3.5 w-3.5" />
-            View in Current WBS
-          </Button>
-          <Button variant="outline" className="h-9 rounded-lg text-xs" onClick={exportOne}>
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            Export This Change
-          </Button>
-        </div>
       </div>
     </aside>
   );
@@ -506,10 +447,10 @@ function EmptyState({ onReview, onImport }: { onReview: () => void; onImport: ()
         <p className="mt-2 text-sm leading-6 text-zinc-500">Approved WBS updates will appear here with meeting evidence.</p>
         <div className="mt-5 flex justify-center gap-2">
           <Button className="rounded-lg bg-zinc-950 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onReview}>
-            Go to Meeting Input
+            회의록 분석으로 이동
           </Button>
           <Button variant="outline" className="rounded-lg text-xs" onClick={onImport}>
-            WBS Setting
+            WBS 설정
           </Button>
         </div>
       </div>

@@ -641,7 +641,7 @@ export default function WbsSetupPage() {
                 {isCreatingNewWbs ? "새 WBS 저장" : "WBS 저장"}
               </Button>
               <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={saving}>
-                회의록 입력으로 계속
+                회의록 분석으로 계속
                 <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             </div>

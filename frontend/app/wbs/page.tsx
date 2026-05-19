@@ -115,7 +115,7 @@ function mappedValue(row: Record<string, string>, mappedColumn: string | undefin
 
 function inferTaskSource(raw: Record<string, string>) {
   const source = firstValue(raw, ["source", "created_from", "origin", "source meeting", "meeting"]);
-  return source && source !== "-" ? source : "WBS Setting에서 직접 등록 또는 가져온 작업";
+  return source && source !== "-" ? source : "WBS 설정에서 직접 등록 또는 가져온 작업";
 }
 
 function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnapshot["mapping"] = {}): WbsRow[] {
@@ -219,7 +219,7 @@ export default function CurrentWbsPage() {
           setRows([]);
           setActiveId(null);
           setDataSource("api");
-          setError(err instanceof Error ? err.message : "저장된 WBS를 불러오지 못했습니다. WBS Setting에서 먼저 저장해 주세요.");
+          setError(err instanceof Error ? err.message : "저장된 WBS를 불러오지 못했습니다. WBS 설정에서 먼저 저장해 주세요.");
         }
       } finally {
         if (alive) setLoading(false);
@@ -699,9 +699,9 @@ function EmptyState({ onImport }: { onImport: () => void }) {
           <FileDown className="h-5 w-5" />
         </div>
         <h2 className="mt-4 text-lg font-semibold text-zinc-950">No WBS data yet</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-500">WBS Setting에서 WBS를 저장하면 현재 일정이 표시됩니다.</p>
+        <p className="mt-2 text-sm leading-6 text-zinc-500">WBS 설정에서 WBS를 저장하면 현재 일정이 표시됩니다.</p>
         <Button className="mt-5 rounded-lg bg-zinc-950 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onImport}>
-          WBS Setting
+          WBS 설정
         </Button>
       </div>
     </div>
