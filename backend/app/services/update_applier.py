@@ -64,19 +64,39 @@ def apply_approved_changes(
 
 
 def _create_new_task(conn: Any, project_id: int, change) -> dict[str, str]:
-    next_id = _next_wbs_id(conn, project_id)
+    next_id = _change_value(change, "proposed_wbs_id") or _next_wbs_id(conn, project_id)
     task_name = change["task_name"] or change["proposed_value"] or "New task"
-    description = change["reason"] or change["evidence"]
+    description = _change_value(change, "proposed_description") or change["reason"] or change["evidence"]
     conn.execute(
         """
         INSERT INTO wbs_rows (
             project_id, wbs_id, task_name, description, owner, start_date, due_date,
             status, dependency, notes, raw_json
-        ) VALUES (?, ?, ?, ?, '', '', '', ?, '', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (project_id, next_id, task_name, description, "예정", change["evidence"], "{}"),
+        (
+            project_id,
+            next_id,
+            task_name,
+            description,
+            _change_value(change, "proposed_owner") or "",
+            _change_value(change, "proposed_start_date") or "",
+            _change_value(change, "proposed_due_date") or "",
+            _change_value(change, "proposed_status") or "예정",
+            _change_value(change, "proposed_dependency") or "",
+            _change_value(change, "proposed_notes") or change["evidence"],
+            "{}",
+        ),
     )
     return {"wbs_id": next_id, "task_name": task_name}
+
+
+def _change_value(change, key: str) -> str | None:
+    if isinstance(change, dict):
+        return change.get(key)
+    if key in change.keys():
+        return change[key]
+    return None
 
 
 def _save_risk(conn: Any, project_id: int, change) -> None:

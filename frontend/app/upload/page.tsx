@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Download,
   FileText,
+  GripVertical,
   Info,
   Play,
   Plus,
@@ -384,6 +385,19 @@ export default function WbsSetupPage() {
     setRows((current) => current.filter((row) => row.clientId !== clientId));
   }
 
+  function moveRow(sourceClientId: string, targetClientId: string) {
+    if (sourceClientId === targetClientId) return;
+    setRows((current) => {
+      const sourceIndex = current.findIndex((row) => row.clientId === sourceClientId);
+      const targetIndex = current.findIndex((row) => row.clientId === targetClientId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  }
+
   async function saveWbs(continueToMeeting = false) {
     if (isCreatingNewWbs && !newWbsName.trim()) {
       setError("새 WBS 이름을 입력해 주세요.");
@@ -589,6 +603,7 @@ export default function WbsSetupPage() {
             validation={validation}
             onAdd={addTask}
             onDelete={deleteRow}
+            onMove={moveRow}
             onUpdate={updateRow}
           />
           {isCreatingNewWbs && (
@@ -625,12 +640,10 @@ export default function WbsSetupPage() {
                 <Table2 className="mr-1.5 h-3.5 w-3.5" />
                 {isCreatingNewWbs ? "새 WBS 저장" : "WBS 저장"}
               </Button>
-              {!isCreatingNewWbs && (
-                <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={saving}>
-                  회의록 입력으로 계속
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
-              )}
+              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={saving}>
+                회의록 입력으로 계속
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
             </div>
           </div>
         </div>
@@ -704,15 +717,18 @@ function EditableWbsTable({
   validation,
   onAdd,
   onDelete,
+  onMove,
   onUpdate
 }: {
   rows: WbsEditableRow[];
   validation: ReturnType<typeof validationFor>;
   onAdd: () => void;
   onDelete: (clientId: string) => void;
+  onMove: (sourceClientId: string, targetClientId: string) => void;
   onUpdate: (clientId: string, field: keyof WbsEditableRow, value: string) => void;
 }) {
   const issueMap = new Map(validation.rowIssues.map((issue) => [issue.rowIndex, issue]));
+  const [draggingClientId, setDraggingClientId] = useState<string | null>(null);
 
   return (
     <section className="mt-5 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -747,6 +763,7 @@ function EditableWbsTable({
             <thead className="bg-zinc-50 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
               <tr className="border-b border-zinc-200">
                 <th className="w-10 px-3 py-3">#</th>
+                <th className="w-10 px-2 py-3" />
                 <th className="w-[96px] px-2 py-3">wbs_id*</th>
                 <th className="w-[180px] px-2 py-3">task_name*</th>
                 <th className="w-[230px] px-2 py-3">description</th>
@@ -767,6 +784,31 @@ function EditableWbsTable({
                 return (
                   <tr key={row.clientId} className={cn("border-b border-zinc-100 last:border-0", hasError && "bg-amber-50/40")}>
                     <td className="px-3 py-2 font-mono text-zinc-400">{index + 1}</td>
+                    <td
+                      className={cn("px-2 py-2", draggingClientId && draggingClientId !== row.clientId && "bg-zinc-50")}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const sourceClientId = event.dataTransfer.getData("text/plain") || draggingClientId;
+                        if (sourceClientId) onMove(sourceClientId, row.clientId);
+                        setDraggingClientId(null);
+                      }}
+                    >
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData("text/plain", row.clientId);
+                          event.dataTransfer.effectAllowed = "move";
+                          setDraggingClientId(row.clientId);
+                        }}
+                        onDragEnd={() => setDraggingClientId(null)}
+                        className="grid h-8 w-8 cursor-grab place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing"
+                        aria-label="행 순서 변경"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </button>
+                    </td>
                     <td className="px-2 py-2">
                       <CellInput value={row.wbs_id} invalid={issue?.missing.includes("wbs_id")} onChange={(value) => onUpdate(row.clientId, "wbs_id", value)} />
                     </td>

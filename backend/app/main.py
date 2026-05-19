@@ -10,12 +10,14 @@ from .models import WBS_FIELDS
 from .schemas import (
     ApplyChangesRequest,
     ApplyChangesResponse,
+    ChangeCandidateUpdateRequest,
     ChangeHistoryResponse,
     MeetingAnalyzeRequest,
     MeetingAnalyzeResponse,
     PendingChangesResponse,
     ProjectCreateRequest,
     ProjectResponse,
+    WbsChangeCandidate,
     WbsMapColumnsRequest,
     WbsMapColumnsResponse,
     WbsUploadResponse,
@@ -253,6 +255,45 @@ def list_pending_changes(project_id: int) -> dict:
         return {"changes": [_change_response(dict(row)) for row in rows]}
 
 
+@app.patch("/api/projects/{project_id}/changes/{change_id}", response_model=WbsChangeCandidate)
+def update_change_candidate(project_id: int, change_id: int, payload: ChangeCandidateUpdateRequest) -> dict:
+    with get_conn() as conn:
+        _ensure_project(conn, project_id)
+        row = conn.execute(
+            "SELECT * FROM change_candidates WHERE project_id = ? AND id = ? AND status = 'pending'",
+            (project_id, change_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Change candidate not found")
+
+        values = payload.model_dump(exclude_unset=True)
+        if values:
+            allowed = {
+                "matched_wbs_id",
+                "task_name",
+                "field",
+                "current_value",
+                "proposed_value",
+                "proposed_wbs_id",
+                "proposed_description",
+                "proposed_owner",
+                "proposed_start_date",
+                "proposed_due_date",
+                "proposed_status",
+                "proposed_dependency",
+                "proposed_notes",
+            }
+            assignments = ", ".join(f"{key} = ?" for key in values if key in allowed)
+            params = [values[key] for key in values if key in allowed]
+            if assignments:
+                conn.execute(
+                    f"UPDATE change_candidates SET {assignments}, updated_at = CURRENT_TIMESTAMP WHERE project_id = ? AND id = ?",
+                    (*params, project_id, change_id),
+                )
+        updated = conn.execute("SELECT * FROM change_candidates WHERE project_id = ? AND id = ?", (project_id, change_id)).fetchone()
+        return _change_response(dict(updated))
+
+
 @app.post("/api/projects/{project_id}/changes/apply", response_model=ApplyChangesResponse)
 def apply_changes(project_id: int, payload: ApplyChangesRequest) -> dict:
     with get_conn() as conn:
@@ -399,6 +440,9 @@ def _canonical_field(field: str | None) -> str | None:
 
 
 def _change_response(row: dict) -> dict:
+    def optional(key: str) -> str | None:
+        return row.get(key)
+
     return {
         "id": str(row["id"]),
         "change_type": row["change_type"],
@@ -407,6 +451,14 @@ def _change_response(row: dict) -> dict:
         "field": row["field"],
         "current_value": row["current_value"],
         "proposed_value": row["proposed_value"],
+        "proposed_wbs_id": optional("proposed_wbs_id"),
+        "proposed_description": optional("proposed_description"),
+        "proposed_owner": optional("proposed_owner"),
+        "proposed_start_date": optional("proposed_start_date"),
+        "proposed_due_date": optional("proposed_due_date"),
+        "proposed_status": optional("proposed_status"),
+        "proposed_dependency": optional("proposed_dependency"),
+        "proposed_notes": optional("proposed_notes"),
         "evidence": row["evidence"],
         "confidence": row["confidence"],
         "requires_confirmation": bool(row["requires_confirmation"]),

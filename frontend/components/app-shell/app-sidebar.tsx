@@ -49,13 +49,13 @@ export function AppSidebar({ projectId, pendingCount = 0 }: Props) {
 
   return (
     <aside className="flex w-[240px] shrink-0 flex-col border-r border-zinc-200 bg-white px-4 py-5">
-      <div className="mb-7 flex items-center gap-2.5 px-2">
+      <Link href={routes.wbs(projectId)} className="mb-7 flex items-center gap-2.5 rounded-lg px-2 py-1 transition-colors hover:bg-zinc-100">
         <div className="relative grid h-7 w-7 place-items-center rounded-lg bg-zinc-950 text-[11px] font-bold text-white">
           W
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#fd312e]" />
         </div>
         <span className="text-[14px] font-semibold tracking-tight text-zinc-950">WBS Keeper</span>
-      </div>
+      </Link>
 
       <nav className="flex-1 space-y-5 overflow-y-auto">
         <div>

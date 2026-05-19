@@ -55,6 +55,14 @@ export type WbsChangeCandidate = {
   field: string | null;
   current_value: string | null;
   proposed_value: string | null;
+  proposed_wbs_id?: string | null;
+  proposed_description?: string | null;
+  proposed_owner?: string | null;
+  proposed_start_date?: string | null;
+  proposed_due_date?: string | null;
+  proposed_status?: string | null;
+  proposed_dependency?: string | null;
+  proposed_notes?: string | null;
   evidence: string;
   confidence: "high" | "medium" | "low";
   requires_confirmation: boolean;

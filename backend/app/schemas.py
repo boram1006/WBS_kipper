@@ -77,6 +77,14 @@ class WbsChangeCandidate(BaseModel):
     field: str | None = None
     current_value: str | None = None
     proposed_value: str | None = None
+    proposed_wbs_id: str | None = None
+    proposed_description: str | None = None
+    proposed_owner: str | None = None
+    proposed_start_date: str | None = None
+    proposed_due_date: str | None = None
+    proposed_status: str | None = None
+    proposed_dependency: str | None = None
+    proposed_notes: str | None = None
     evidence: str
     confidence: Literal["high", "medium", "low"]
     requires_confirmation: bool
@@ -102,6 +110,22 @@ class MeetingAnalyzeResponse(BaseModel):
 
 class PendingChangesResponse(BaseModel):
     changes: list[WbsChangeCandidate]
+
+
+class ChangeCandidateUpdateRequest(BaseModel):
+    matched_wbs_id: str | None = None
+    task_name: str | None = None
+    field: str | None = None
+    current_value: str | None = None
+    proposed_value: str | None = None
+    proposed_wbs_id: str | None = None
+    proposed_description: str | None = None
+    proposed_owner: str | None = None
+    proposed_start_date: str | None = None
+    proposed_due_date: str | None = None
+    proposed_status: str | None = None
+    proposed_dependency: str | None = None
+    proposed_notes: str | None = None
 
 
 class ApplyChangesRequest(BaseModel):

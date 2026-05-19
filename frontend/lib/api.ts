@@ -8,6 +8,7 @@ import type {
   ProjectCreateRequest,
   ProjectResponse,
   ProjectsResponse,
+  WbsChangeCandidate,
   WbsColumnMapping,
   WbsMapColumnsResponse,
   WbsUploadResponse
@@ -80,6 +81,12 @@ export const api = {
 
   getPendingChanges: (projectId: string | number) =>
     request<PendingChangesResponse>(`/api/projects/${projectId}/changes/pending`),
+
+  updateChangeCandidate: (projectId: string | number, changeId: string | number, payload: Partial<WbsChangeCandidate>) =>
+    request<WbsChangeCandidate>(`/api/projects/${projectId}/changes/${changeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
 
   applyChanges: (projectId: string | number, changeIds: string[]) =>
     request<ApplyChangesResponse>(`/api/projects/${projectId}/changes/apply`, {

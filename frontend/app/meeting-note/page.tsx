@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,10 +12,8 @@ import {
   Check,
   ClipboardList,
   FileText,
-  History,
   Link2,
   RefreshCw,
-  Save,
   Sparkles,
   Trash2,
   Upload,
@@ -66,6 +64,7 @@ const detectionItems = [
 ] as const;
 
 type DetectionKey = (typeof detectionItems)[number]["key"];
+type WbsRowRecord = Record<string, string>;
 
 const toneClass: Record<string, string> = {
   emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -85,6 +84,7 @@ export default function MeetingNotePage() {
   const [applying, setApplying] = useState(false);
   const [autoMatch, setAutoMatch] = useState(true);
   const [reviewCandidates, setReviewCandidates] = useState<WbsChangeCandidate[]>([]);
+  const [currentWbsRows, setCurrentWbsRows] = useState<WbsRowRecord[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [analysisDone, setAnalysisDone] = useState(false);
   const [enabledDetection, setEnabledDetection] = useState<Record<DetectionKey, boolean>>(() =>
@@ -129,6 +129,23 @@ export default function MeetingNotePage() {
   ];
   const readyCount = readiness.filter((item) => item.ready).length;
   const canAnalyze = Boolean(projectId && meetingDate && meetingTitle.trim() && noteStats.chars >= 10);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadCurrentWbs() {
+      if (!projectId) return;
+      try {
+        const snapshot = await api.getWbs(projectId);
+        if (alive) setCurrentWbsRows(snapshot.rows_preview);
+      } catch {
+        if (alive) setCurrentWbsRows([]);
+      }
+    }
+    void loadCurrentWbs();
+    return () => {
+      alive = false;
+    };
+  }, [projectId]);
 
   function loadSample() {
     form.setValue("meeting_note", SAMPLE_NOTE, { shouldDirty: true, shouldValidate: true });
@@ -179,6 +196,7 @@ export default function MeetingNotePage() {
     setError(null);
     setMessage(null);
     try {
+      await Promise.all(selectedCandidates.map((candidate) => api.updateChangeCandidate(projectId, candidate.id, candidate)));
       const result = await api.applyChanges(projectId, Array.from(selected));
       const pending = await api.getPendingChanges(projectId);
       setReviewCandidates(pending.changes);
@@ -199,6 +217,12 @@ export default function MeetingNotePage() {
       else next.delete(candidateId);
       return next;
     });
+  }
+
+  function updateCandidate(candidateId: string, patch: Partial<WbsChangeCandidate>) {
+    setReviewCandidates((current) =>
+      current.map((candidate) => (candidate.id === candidateId ? { ...candidate, ...patch } : candidate))
+    );
   }
 
   return (
@@ -227,21 +251,7 @@ export default function MeetingNotePage() {
             <div className="flex flex-wrap items-center gap-2">
               <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} />
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm" type="button">
-                <History className="mr-1.5 h-3.5 w-3.5" />
                 이전 회의 불러오기
-              </Button>
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs text-zinc-800 shadow-sm" type="button">
-                <Save className="mr-1.5 h-3.5 w-3.5" />
-                임시 저장
-              </Button>
-              <Button
-                className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
-                disabled={!canAnalyze || loading}
-                onClick={form.handleSubmit(onSubmit)}
-                type="button"
-              >
-                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                {loading ? "분석 중..." : "회의록 분석"}
               </Button>
             </div>
           </div>
@@ -361,11 +371,20 @@ export default function MeetingNotePage() {
                   />
                   <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    변경 후보 {Math.max(0, Math.min(9, Math.round(noteStats.chars / 90)))}개 예상
+                    {analysisDone ? `변경 후보 ${pendingCandidates.length}개` : "분석 전"}
                   </div>
                 </div>
-                <div className="flex items-center justify-between border-t border-zinc-100 px-4 py-3 text-[11px] text-zinc-400">
-                  <span className="font-medium uppercase tracking-[0.05em]">Markdown 지원</span>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-4 py-3 text-[11px] text-zinc-400">
+                  <Button
+                    type="button"
+                    disabled={!canAnalyze || loading}
+                    onClick={form.handleSubmit(onSubmit)}
+                    className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
+                  >
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    {loading ? "분석 중..." : "회의록 분석"}
+                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
                   <div className="flex items-center divide-x divide-zinc-100 text-center">
                     <Stat value={noteStats.chars} label="글자" />
                     <Stat value={noteStats.lines} label="줄" />
@@ -383,7 +402,9 @@ export default function MeetingNotePage() {
                 selected={selected}
                 applying={applying}
                 onToggle={toggleCandidate}
+                onUpdate={updateCandidate}
                 onApply={() => void applySelected()}
+                wbsRows={currentWbsRows}
               />
             </div>
 
@@ -424,22 +445,7 @@ export default function MeetingNotePage() {
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
             {message || "회의 정보, 분석 설정, 회의록 원문을 확인한 뒤 WBS 업데이트 후보를 검토하세요."}
           </div>
-          <div className="flex items-center gap-2">
-            {error && <span className="mr-2 text-[12px] text-amber-700">{error}</span>}
-            <Button variant="outline" type="button" className="h-8 rounded-lg px-3 text-xs">
-              임시 저장
-            </Button>
-            <Button
-              type="button"
-              disabled={!canAnalyze || loading}
-              onClick={form.handleSubmit(onSubmit)}
-              className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
-            >
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              {loading ? "분석 중..." : "회의록 분석"}
-              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-            </Button>
-          </div>
+          {error && <span className="text-[12px] text-amber-700">{error}</span>}
         </div>
       </div>
     </div>
@@ -452,15 +458,21 @@ function CandidateReviewPanel({
   selected,
   applying,
   onToggle,
-  onApply
+  onUpdate,
+  onApply,
+  wbsRows
 }: {
   analysisDone: boolean;
   candidates: WbsChangeCandidate[];
   selected: Set<string>;
   applying: boolean;
   onToggle: (candidateId: string, checked?: boolean) => void;
+  onUpdate: (candidateId: string, patch: Partial<WbsChangeCandidate>) => void;
   onApply: () => void;
+  wbsRows: WbsRowRecord[];
 }) {
+  const rowMap = useMemo(() => new Map(wbsRows.map((row) => [row.wbs_id, row])), [wbsRows]);
+
   return (
     <Panel
       step="4"
@@ -495,16 +507,21 @@ function CandidateReviewPanel({
         <div className="divide-y divide-zinc-100">
           {candidates.map((candidate) => {
             const checked = selected.has(candidate.id);
+            const matchedRow = candidate.matched_wbs_id ? rowMap.get(candidate.matched_wbs_id) : undefined;
+            const isNewTask = candidate.change_type === "new_task" || !candidate.current_value;
             return (
-              <button
+              <div
                 key={candidate.id}
-                type="button"
-                onClick={() => onToggle(candidate.id)}
                 className="flex w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-zinc-50"
               >
-                <span className={cn("mt-1 grid h-4 w-4 shrink-0 place-items-center rounded border", checked ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-300 bg-white text-transparent")}>
+                <button
+                  type="button"
+                  onClick={() => onToggle(candidate.id)}
+                  className={cn("mt-1 grid h-4 w-4 shrink-0 place-items-center rounded border", checked ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-300 bg-white text-transparent")}
+                  aria-label="후보 선택"
+                >
                   <Check className="h-3 w-3" />
-                </span>
+                </button>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[13px] font-semibold text-zinc-950">{candidate.task_name}</span>
@@ -517,7 +534,7 @@ function CandidateReviewPanel({
                   <span className="mt-2 grid gap-2 text-[12px] text-zinc-600 md:grid-cols-[1fr_auto_1fr]">
                     <span className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
                       <b className="mr-1 text-zinc-400">Before</b>
-                      {candidate.current_value || "-"}
+                      {candidate.current_value || (isNewTask ? "신규 작업" : "-")}
                     </span>
                     <ArrowRight className="mx-auto mt-2 h-3.5 w-3.5 text-zinc-400" />
                     <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">
@@ -525,17 +542,83 @@ function CandidateReviewPanel({
                       {candidate.proposed_value || "-"}
                     </span>
                   </span>
+                  {matchedRow && (
+                    <span className="mt-2 grid gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11.5px] text-zinc-600 md:grid-cols-4">
+                      <Detail label="Task ID" value={matchedRow.wbs_id} />
+                      <Detail label="담당자" value={matchedRow.owner || "-"} />
+                      <Detail label="시작일" value={matchedRow.start_date || "-"} />
+                      <Detail label="종료일" value={matchedRow.due_date || "-"} />
+                    </span>
+                  )}
+                  <span className="mt-3 block rounded-lg border border-zinc-200 bg-white p-3">
+                    <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.05em] text-zinc-400">
+                      {isNewTask ? "신규 Task 등록 정보" : "업데이트 등록 정보"}
+                    </span>
+                    {isNewTask ? (
+                      <span className="grid gap-2 md:grid-cols-3">
+                        <CandidateInput label="Task ID" value={candidate.proposed_wbs_id || ""} onChange={(value) => onUpdate(candidate.id, { proposed_wbs_id: value })} />
+                        <CandidateInput label="작업명" value={candidate.task_name || ""} onChange={(value) => onUpdate(candidate.id, { task_name: value, proposed_value: value })} />
+                        <CandidateInput label="담당자" value={candidate.proposed_owner || ""} onChange={(value) => onUpdate(candidate.id, { proposed_owner: value })} />
+                        <CandidateInput label="시작일" type="date" value={candidate.proposed_start_date || ""} onChange={(value) => onUpdate(candidate.id, { proposed_start_date: value })} />
+                        <CandidateInput label="종료일" type="date" value={candidate.proposed_due_date || ""} onChange={(value) => onUpdate(candidate.id, { proposed_due_date: value })} />
+                        <CandidateInput label="상태" value={candidate.proposed_status || "예정"} onChange={(value) => onUpdate(candidate.id, { proposed_status: value })} />
+                        <CandidateInput label="의존 작업" value={candidate.proposed_dependency || ""} onChange={(value) => onUpdate(candidate.id, { proposed_dependency: value })} />
+                        <CandidateInput label="설명" value={candidate.proposed_description || candidate.reason || ""} onChange={(value) => onUpdate(candidate.id, { proposed_description: value })} className="md:col-span-2" />
+                      </span>
+                    ) : (
+                      <span className="grid gap-2 md:grid-cols-3">
+                        <CandidateInput label="Task ID" value={candidate.matched_wbs_id || ""} onChange={(value) => onUpdate(candidate.id, { matched_wbs_id: value })} />
+                        <CandidateInput label="변경 필드" value={candidate.field || ""} onChange={(value) => onUpdate(candidate.id, { field: value })} />
+                        <CandidateInput label="변경값" value={candidate.proposed_value || ""} onChange={(value) => onUpdate(candidate.id, { proposed_value: value })} />
+                      </span>
+                    )}
+                  </span>
                   <span className="mt-2 block rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[12px] leading-5 text-zinc-600">
                     <b className="mr-1 text-zinc-400">Evidence</b>
                     “{candidate.evidence}”
                   </span>
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>
       )}
     </Panel>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <span>
+      <span className="block text-[10.5px] font-semibold text-zinc-400">{label}</span>
+      <span className="mt-0.5 block truncate font-medium text-zinc-700">{value}</span>
+    </span>
+  );
+}
+
+function CandidateInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  className
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  className?: string;
+}) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="mb-1 block text-[10.5px] font-semibold text-zinc-500">{label}</span>
+      <Input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-8 rounded-md border-zinc-200 px-2 text-[12px] shadow-none"
+      />
+    </label>
   );
 }
 
