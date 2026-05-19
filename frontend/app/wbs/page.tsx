@@ -43,6 +43,7 @@ type WbsRow = {
   lastUpdated: string;
   badges: WbsBadge[];
   notes: string;
+  taskSource: string;
 };
 
 type WbsBadge = "recent" | "new" | "schedule" | "owner" | "status" | "confirm";
@@ -112,6 +113,11 @@ function mappedValue(row: Record<string, string>, mappedColumn: string | undefin
   return firstValue(row, fallbackKeys, fallback);
 }
 
+function inferTaskSource(raw: Record<string, string>) {
+  const source = firstValue(raw, ["source", "created_from", "origin", "source meeting", "meeting"]);
+  return source && source !== "-" ? source : "WBS Setting에서 직접 등록 또는 가져온 작업";
+}
+
 function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnapshot["mapping"] = {}): WbsRow[] {
   return rows.map((raw, index) => {
     const wbsId = mappedValue(raw, mapping?.id, ["wbs_id", "wbs id", "wbs코드", "id", "_row_id"], `${index + 1}`);
@@ -127,7 +133,8 @@ function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnap
       dependency: mappedValue(raw, mapping?.dependency, ["dependency", "depends on", "의존성"], "-"),
       lastUpdated: firstValue(raw, ["updated_at", "last updated"], "-"),
       badges: [],
-      notes: mappedValue(raw, mapping?.notes, ["notes", "비고"], "")
+      notes: mappedValue(raw, mapping?.notes, ["notes", "비고"], ""),
+      taskSource: inferTaskSource(raw)
     };
   });
 }
@@ -448,7 +455,7 @@ function SummaryCard({
       onClick={onClick}
       className={cn(
         "rounded-xl border bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-zinc-300 hover:bg-zinc-50",
-        active ? "border-zinc-950 ring-1 ring-zinc-950" : "border-zinc-200"
+        active ? "border-zinc-300 bg-zinc-50 shadow-[inset_0_0_0_1px_rgba(113,113,122,0.18)]" : "border-zinc-200"
       )}
     >
       <div className="flex items-center justify-between">
@@ -497,7 +504,7 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
             <div className="relative flex justify-between">
               <span>{formatShortDate(min)}</span>
               <span className="absolute -top-0.5 -translate-x-1/2 text-[#fd312e]" style={{ left: `${todayLeft}%` }}>
-                Today
+                Today ({formatShortDate(todayTime)})
               </span>
               <span>{formatShortDate(max)}</span>
             </div>
@@ -556,7 +563,6 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
       <div className="min-h-0 flex-1 space-y-5 overflow-auto px-4 py-4">
         <section>
           <h3 className="text-lg font-semibold leading-6 tracking-tight text-zinc-950">{row.taskName}</h3>
-          {row.description ? <p className="mt-1 text-[12.5px] leading-5 text-zinc-500">{row.description}</p> : null}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
             {row.badges.map((badge) => (
@@ -564,6 +570,12 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
             ))}
           </div>
         </section>
+
+        {row.description && (
+          <DrawerSection title="Description">
+            <p className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[12.5px] leading-5 text-zinc-700">{row.description}</p>
+          </DrawerSection>
+        )}
 
         <section className="grid grid-cols-2 gap-2 text-[12px]">
           <DetailItem label="Task ID" value={row.wbsId} icon={Table2} />
@@ -573,6 +585,10 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
           <DetailItem label="Dependency" value={row.dependency} icon={GitBranch} />
           <DetailItem label="Last updated" value={row.lastUpdated} icon={Clock3} />
         </section>
+
+        <DrawerSection title="Task source">
+          <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12.5px] leading-5 text-zinc-700">{row.taskSource}</p>
+        </DrawerSection>
 
         {row.notes && (
           <DrawerSection title="Notes">

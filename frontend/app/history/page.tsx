@@ -9,7 +9,6 @@ import {
   Calendar,
   CheckCircle2,
   Clipboard,
-  Copy,
   Download,
   FileDown,
   GitBranch,
@@ -44,10 +43,8 @@ type HistoryRow = {
   evidence: string;
   confidence: "high" | "medium" | "low";
   requiresConfirmation: boolean;
-  sourceMeeting: string;
   meetingDate: string;
   appliedBy: string;
-  reason: string;
 };
 
 const changeTypes = [
@@ -63,10 +60,14 @@ const changeTypes = [
 
 const confidenceOptions = ["all", "high", "medium", "low"];
 
+function formatChangedAt(value: string) {
+  return value ? value.replace("T", " ").split(".")[0] : "-";
+}
+
 function normalizeHistory(item: ChangeHistoryItem): HistoryRow {
   return {
     id: String(item.id),
-    changedAt: item.changed_at,
+    changedAt: formatChangedAt(item.changed_at),
     changeType: item.change_type,
     wbsId: item.wbs_id,
     taskName: item.task_name,
@@ -76,10 +77,8 @@ function normalizeHistory(item: ChangeHistoryItem): HistoryRow {
     evidence: item.evidence,
     confidence: item.confidence === "medium" || item.confidence === "low" ? item.confidence : "high",
     requiresConfirmation: false,
-    sourceMeeting: "Applied meeting",
     meetingDate: item.changed_at?.slice(0, 10) || "-",
-    appliedBy: item.applied_by,
-    reason: "Approved change stored in change_history."
+    appliedBy: item.applied_by
   };
 }
 
@@ -94,7 +93,6 @@ export default function HistoryPage() {
   const [dateRange, setDateRange] = useState("all");
   const [changeType, setChangeType] = useState("all");
   const [confidence, setConfidence] = useState("all");
-  const [sourceMeeting, setSourceMeeting] = useState("all");
   const [appliedBy, setAppliedBy] = useState("all");
 
   useEffect(() => {
@@ -107,7 +105,7 @@ export default function HistoryPage() {
         const normalized = response.history.map(normalizeHistory);
         if (!alive) return;
         setRows(normalized);
-        setActiveId(normalized[0]?.id ?? null);
+        setActiveId(null);
       } catch (err) {
         if (!alive) return;
         setRows([]);
@@ -123,7 +121,6 @@ export default function HistoryPage() {
     };
   }, [projectId]);
 
-  const meetings = useMemo(() => ["all", ...Array.from(new Set(rows.map((row) => row.sourceMeeting)))], [rows]);
   const appliers = useMemo(() => ["all", ...Array.from(new Set(rows.map((row) => row.appliedBy)))], [rows]);
 
   const filteredRows = useMemo(() => {
@@ -135,13 +132,12 @@ export default function HistoryPage() {
       const matchesDate = dateRange === "all" || row.changedAt.startsWith(dateRange);
       const matchesType = changeType === "all" || row.changeType === changeType;
       const matchesConfidence = confidence === "all" || row.confidence === confidence;
-      const matchesMeeting = sourceMeeting === "all" || row.sourceMeeting === sourceMeeting;
       const matchesApplier = appliedBy === "all" || row.appliedBy === appliedBy;
-      return matchesQuery && matchesDate && matchesType && matchesConfidence && matchesMeeting && matchesApplier;
+      return matchesQuery && matchesDate && matchesType && matchesConfidence && matchesApplier;
     });
-  }, [appliedBy, changeType, confidence, dateRange, query, rows, sourceMeeting]);
+  }, [appliedBy, changeType, confidence, dateRange, query, rows]);
 
-  const activeRow = rows.find((row) => row.id === activeId) ?? filteredRows[0] ?? null;
+  const activeRow = activeId ? rows.find((row) => row.id === activeId) ?? null : null;
   const summary = useMemo(
     () => ({
       total: rows.length,
@@ -155,7 +151,7 @@ export default function HistoryPage() {
 
   function exportHistory() {
     const csv = [
-      ["changed_at", "change_type", "wbs_id", "task_name", "field", "before", "after", "confidence", "source_meeting", "applied_by", "evidence"],
+      ["changed_at", "change_type", "wbs_id", "task_name", "field", "before", "after", "confidence", "applied_by", "evidence"],
       ...filteredRows.map((row) => [
         row.changedAt,
         row.changeType,
@@ -165,7 +161,6 @@ export default function HistoryPage() {
         row.before,
         row.after,
         row.confidence,
-        row.sourceMeeting,
         row.appliedBy,
         row.evidence
       ])
@@ -224,7 +219,7 @@ export default function HistoryPage() {
           ) : rows.length === 0 ? (
             <EmptyState onReview={() => router.push(routes.meetingNote(projectId))} onImport={() => router.push(routes.upload(projectId))} />
           ) : (
-            <div className="grid grid-cols-[minmax(820px,1fr)_360px] gap-4">
+            <div className={cn("grid gap-4", activeRow ? "grid-cols-[minmax(820px,1fr)_360px]" : "grid-cols-1")}>
               <div className="min-w-0 space-y-4">
                 {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-800">
@@ -255,7 +250,6 @@ export default function HistoryPage() {
                     <FilterSelect value={dateRange} onChange={setDateRange} options={["all", "2026-05-17"]} allLabel="All dates" />
                     <FilterSelect value={changeType} onChange={setChangeType} options={changeTypes} labels={changeTypeLabels} allLabel="All change types" />
                     <FilterSelect value={confidence} onChange={setConfidence} options={confidenceOptions} allLabel="All confidence" />
-                    <FilterSelect value={sourceMeeting} onChange={setSourceMeeting} options={meetings} allLabel="All meetings" />
                     <FilterSelect value={appliedBy} onChange={setAppliedBy} options={appliers} allLabel="All users" />
                   </div>
 
@@ -271,7 +265,6 @@ export default function HistoryPage() {
                           <Th>Before</Th>
                           <Th>After</Th>
                           <Th>Confidence</Th>
-                          <Th>Source meeting</Th>
                           <Th>Applied by</Th>
                         </tr>
                       </thead>
@@ -293,11 +286,6 @@ export default function HistoryPage() {
                             <Td className="max-w-[120px] truncate text-zinc-500 line-through decoration-zinc-300">{row.before}</Td>
                             <Td className="max-w-[140px] truncate font-semibold text-zinc-950">{row.after}</Td>
                             <Td><ConfidenceBadge confidence={row.confidence} /></Td>
-                            <Td>
-                              <button type="button" onClick={(event) => event.stopPropagation()} className="rounded border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50">
-                                {row.sourceMeeting}
-                              </button>
-                            </Td>
                             <Td>{row.appliedBy}</Td>
                           </tr>
                         ))}
@@ -308,7 +296,7 @@ export default function HistoryPage() {
                 </section>
               </div>
 
-              <HistoryDrawer row={activeRow} projectId={projectId} />
+              {activeRow && <HistoryDrawer row={activeRow} projectId={projectId} onClose={() => setActiveId(null)} />}
             </div>
           )}
         </main>
@@ -342,16 +330,9 @@ function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; l
   );
 }
 
-function HistoryDrawer({ row, projectId }: { row: HistoryRow | null; projectId: string }) {
+function HistoryDrawer({ row, projectId, onClose }: { row: HistoryRow; projectId: string; onClose: () => void }) {
   const router = useRouter();
-  if (!row) {
-    return <aside className="flex min-h-0 flex-col rounded-xl border border-dashed border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">변경 이력을 선택하면 상세 정보가 표시됩니다.</aside>;
-  }
   const current = row;
-
-  function copyEvidence() {
-    void navigator.clipboard?.writeText(current.evidence);
-  }
 
   function exportOne() {
     const payload = JSON.stringify(current, null, 2);
@@ -371,7 +352,9 @@ function HistoryDrawer({ row, projectId }: { row: HistoryRow | null; projectId: 
           <h2 className="text-sm font-semibold leading-5 text-zinc-950">Change Detail</h2>
           <p className="font-mono text-[11px] font-medium uppercase text-zinc-400">CHANGE {row.id}</p>
         </div>
-        <ChangeTypeBadge type={row.changeType} />
+        <button type="button" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-zinc-100" aria-label="Close">
+          <X className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <div className="min-h-0 flex-1 space-y-5 overflow-auto px-4 py-4">
@@ -381,7 +364,7 @@ function HistoryDrawer({ row, projectId }: { row: HistoryRow | null; projectId: 
           <div className="mt-2 flex flex-wrap gap-1.5">
             <ConfidenceBadge confidence={row.confidence} />
             {row.requiresConfirmation && <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-rose-800">Requires confirmation</span>}
-            <span className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10.5px] font-semibold text-zinc-600">{row.sourceMeeting}</span>
+            <ChangeTypeBadge type={row.changeType} />
           </div>
         </section>
 
@@ -404,25 +387,15 @@ function HistoryDrawer({ row, projectId }: { row: HistoryRow | null; projectId: 
           <blockquote className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12.5px] leading-5 text-zinc-700">“{row.evidence}”</blockquote>
         </DrawerSection>
 
-        <DrawerSection title="AI reasoning">
-          <p className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[12.5px] leading-5 text-zinc-700">{row.reason}</p>
-        </DrawerSection>
-
         <div className="grid gap-2">
           <Button className="h-9 rounded-lg bg-zinc-950 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => router.push(routes.wbs(projectId))}>
             <Table2 className="mr-1.5 h-3.5 w-3.5" />
             View in Current WBS
           </Button>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" className="h-9 rounded-lg text-xs" onClick={copyEvidence}>
-              <Copy className="mr-1.5 h-3.5 w-3.5" />
-              Copy Evidence
-            </Button>
-            <Button variant="outline" className="h-9 rounded-lg text-xs" onClick={exportOne}>
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              Export This Change
-            </Button>
-          </div>
+          <Button variant="outline" className="h-9 rounded-lg text-xs" onClick={exportOne}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Export This Change
+          </Button>
         </div>
       </div>
     </aside>
