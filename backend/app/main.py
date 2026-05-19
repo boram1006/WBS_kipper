@@ -203,6 +203,10 @@ def analyze_meeting(project_id: int, payload: MeetingAnalyzeRequest) -> dict:
             enabled_detection=payload.enabled_detection,
             auto_match=payload.auto_match,
         )
+        conn.execute(
+            "DELETE FROM change_candidates WHERE project_id = ? AND status = 'pending'",
+            (project_id,),
+        )
         meeting_id = conn.execute(
             """
             INSERT INTO meetings (project_id, meeting_title, meeting_date, meeting_note, summary_json)
