@@ -9,10 +9,11 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  EyeOff,
   FileDown,
   GitBranch,
   Info,
-
+  Maximize2,
   Search,
   Sparkles,
   Table2,
@@ -28,7 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { useActiveProjectId } from "@/lib/use-project-id";
-import { loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot } from "@/lib/wbs-cache";
+import { loadWbsMilestones, loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type WbsRow = {
@@ -158,6 +159,15 @@ function ganttRange(rows: WbsRow[]) {
   return { min: Math.min(...times), max: Math.max(...times) };
 }
 
+function ganttTimelineRange(rows: WbsRow[], milestones: WbsMilestone[]) {
+  const times = [
+    ...rows.flatMap((row) => [toTime(row.startDate), toTime(row.dueDate)]),
+    ...milestones.map((milestone) => toTime(milestone.date))
+  ].filter((time): time is number => time != null);
+  if (!times.length) return null;
+  return { min: Math.min(...times), max: Math.max(...times) };
+}
+
 function formatShortDate(time: number) {
   return new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit" }).format(new Date(time));
 }
@@ -183,6 +193,13 @@ export default function CurrentWbsPage() {
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [recentOnly, setRecentOnly] = useState(false);
   const [changeTypeFilter, setChangeTypeFilter] = useState<(typeof changeTypeOptions)[number]["value"]>("all");
+  const [showCompletedInGantt, setShowCompletedInGantt] = useState(true);
+  const [ganttHeight, setGanttHeight] = useState(320);
+  const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
+
+  useEffect(() => {
+    setMilestones(projectId ? loadWbsMilestones(projectId) : []);
+  }, [projectId]);
 
   useEffect(() => {
     let alive = true;
@@ -343,7 +360,14 @@ export default function CurrentWbsPage() {
                   <SummaryCard icon={Sparkles} label="Recently Updated" value={summary.recent} tone="recent" active={activeSummaryFilter === "recent"} onClick={() => applySummaryFilter("recent")} />
                 </section>
 
-                <GanttChart rows={filteredRows} />
+                <GanttChart
+                  rows={filteredRows}
+                  milestones={milestones}
+                  height={ganttHeight}
+                  showCompleted={showCompletedInGantt}
+                  onHeightChange={setGanttHeight}
+                  onShowCompletedChange={setShowCompletedInGantt}
+                />
 
                 <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-3">
@@ -469,8 +493,24 @@ function SummaryCard({
   );
 }
 
-function GanttChart({ rows }: { rows: WbsRow[] }) {
-  const range = ganttRange(rows);
+function GanttChart({
+  rows,
+  milestones,
+  height,
+  showCompleted,
+  onHeightChange,
+  onShowCompletedChange
+}: {
+  rows: WbsRow[];
+  milestones: WbsMilestone[];
+  height: number;
+  showCompleted: boolean;
+  onHeightChange: (height: number) => void;
+  onShowCompletedChange: (show: boolean) => void;
+}) {
+  const visibleRows = showCompleted ? rows : rows.filter((row) => statusBucket(row.status) !== "completed");
+  const validMilestones = milestones.filter((milestone) => toTime(milestone.date) != null);
+  const range = ganttTimelineRange(visibleRows, validMilestones);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayTime = today.getTime();
@@ -478,10 +518,11 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
   const max = range ? Math.max(range.max, todayTime) : todayTime;
   const span = Math.max(max - min, 24 * 60 * 60 * 1000);
   const todayLeft = Math.max(0, Math.min(100, ((todayTime - min) / span) * 100));
+  const completedCount = rows.filter((row) => statusBucket(row.status) === "completed").length;
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <Calendar className="h-3.5 w-3.5 text-zinc-500" />
@@ -489,16 +530,38 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
           </h2>
           <p className="mt-1 text-xs text-zinc-500">빨간 기준선은 오늘 날짜입니다.</p>
         </div>
-        {range && (
-          <span className="text-[11px] font-medium text-zinc-400">
-            {formatShortDate(min)} - {formatShortDate(max)}
-          </span>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <label className="flex h-8 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-[11.5px] font-medium text-zinc-700">
+            <Switch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
+            <EyeOff className="h-3.5 w-3.5 text-zinc-500" />
+            완료 숨김
+            {completedCount > 0 && <span className="text-zinc-400">({completedCount})</span>}
+          </label>
+          <label className="flex h-8 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-[11.5px] font-medium text-zinc-700">
+            <Maximize2 className="h-3.5 w-3.5 text-zinc-500" />
+            높이
+            <input
+              type="range"
+              min={240}
+              max={720}
+              step={40}
+              value={height}
+              onChange={(event) => onHeightChange(Number(event.target.value))}
+              className="w-28 accent-zinc-900"
+            />
+            <span className="w-10 text-right text-zinc-400">{height}px</span>
+          </label>
+          {range && (
+            <span className="text-[11px] font-medium text-zinc-400">
+              {formatShortDate(min)} - {formatShortDate(max)}
+            </span>
+          )}
+        </div>
       </div>
       {!range ? (
         <div className="px-6 py-10 text-center text-sm text-zinc-500">시작일과 마감일이 있는 WBS를 저장하면 간트 차트가 표시됩니다.</div>
       ) : (
-        <div className="max-h-[320px] overflow-auto px-4 py-3">
+        <div className="overflow-auto px-4 py-3" style={{ height }}>
           <div className="mb-2 grid grid-cols-[180px_1fr_90px] gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400">
             <span>Task</span>
             <div className="relative flex justify-between">
@@ -506,12 +569,20 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
               <span className="absolute -top-0.5 -translate-x-1/2 text-[#fd312e]" style={{ left: `${todayLeft}%` }}>
                 Today ({formatShortDate(todayTime)})
               </span>
+              {validMilestones.map((milestone) => {
+                const left = Math.max(0, Math.min(100, ((toTime(milestone.date)! - min) / span) * 100));
+                return (
+                  <span key={milestone.id} className="absolute top-4 -translate-x-1/2 text-[10px] font-semibold text-violet-700" style={{ left: `${left}%` }}>
+                    {milestone.label}
+                  </span>
+                );
+              })}
               <span>{formatShortDate(max)}</span>
             </div>
             <span>Status</span>
           </div>
           <div className="space-y-2">
-            {rows.map((row) => {
+            {visibleRows.map((row) => {
               const start = toTime(row.startDate) ?? min;
               const due = toTime(row.dueDate) ?? start;
               const left = Math.max(0, Math.min(100, ((start - min) / span) * 100));
@@ -527,6 +598,17 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
                       className="absolute bottom-0 top-0 z-10 w-px bg-[#fd312e]"
                       style={{ left: `${todayLeft}%` }}
                     />
+                    {validMilestones.map((milestone) => {
+                      const milestoneLeft = Math.max(0, Math.min(100, ((toTime(milestone.date)! - min) / span) * 100));
+                      return (
+                        <div
+                          key={milestone.id}
+                          className="absolute bottom-0 top-0 z-10 w-px bg-violet-500"
+                          style={{ left: `${milestoneLeft}%` }}
+                          title={`${milestone.label} (${milestone.date})`}
+                        />
+                      );
+                    })}
                     <div
                       className={cn("absolute top-1/2 h-3 -translate-y-1/2 rounded-full", ganttBarClass(row.status))}
                       style={{ left: `${left}%`, width: `${width}%` }}
@@ -536,6 +618,11 @@ function GanttChart({ rows }: { rows: WbsRow[] }) {
                 </div>
               );
             })}
+            {visibleRows.length === 0 && (
+              <div className="rounded-lg border border-dashed border-zinc-200 px-4 py-8 text-center text-sm text-zinc-500">
+                표시할 일정이 없습니다. 완료 숨김을 끄면 완료된 일정도 다시 표시됩니다.
+              </div>
+            )}
           </div>
         </div>
       )}

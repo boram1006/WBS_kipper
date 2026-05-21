@@ -1,6 +1,13 @@
 import type { WbsColumnMapping, WbsUploadResponse } from "@/lib/types";
 
 const WBS_SNAPSHOT_KEY = "wbs_keeper_wbs_snapshot";
+const WBS_MILESTONES_KEY = "wbs_keeper_wbs_milestones";
+
+export type WbsMilestone = {
+  id: string;
+  label: string;
+  date: string;
+};
 
 export type CachedWbsSnapshot = WbsUploadResponse & {
   mapping?: Partial<WbsColumnMapping>;
@@ -9,6 +16,10 @@ export type CachedWbsSnapshot = WbsUploadResponse & {
 
 function key(projectId: string | number) {
   return `${WBS_SNAPSHOT_KEY}:${projectId}`;
+}
+
+function milestoneKey(projectId: string | number) {
+  return `${WBS_MILESTONES_KEY}:${projectId}`;
 }
 
 export function saveWbsSnapshot(projectId: string | number, snapshot: WbsUploadResponse, mapping?: Partial<WbsColumnMapping>) {
@@ -28,5 +39,24 @@ export function loadWbsSnapshot(projectId: string | number): CachedWbsSnapshot |
     return raw ? (JSON.parse(raw) as CachedWbsSnapshot) : null;
   } catch {
     return null;
+  }
+}
+
+export function saveWbsMilestones(projectId: string | number, milestones: WbsMilestone[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(milestoneKey(projectId), JSON.stringify(milestones));
+}
+
+export function loadWbsMilestones(projectId: string | number): WbsMilestone[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(milestoneKey(projectId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as WbsMilestone[];
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => item.id && item.label && item.date)
+      : [];
+  } catch {
+    return [];
   }
 }

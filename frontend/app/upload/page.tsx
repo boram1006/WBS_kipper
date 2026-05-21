@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
+  CalendarDays,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -28,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { setActiveProjectId, useActiveProjectId } from "@/lib/use-project-id";
-import { loadWbsSnapshot, saveWbsSnapshot } from "@/lib/wbs-cache";
+import { loadWbsMilestones, loadWbsSnapshot, saveWbsMilestones, saveWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type StandardColumn = {
@@ -91,6 +92,14 @@ const SAMPLE_ROWS = [
 
 function createClientId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createMilestone(): WbsMilestone {
+  return {
+    id: createClientId(),
+    label: "",
+    date: ""
+  };
 }
 
 function rowFromValues(values: string[]): WbsEditableRow {
@@ -240,11 +249,16 @@ export default function WbsSetupPage() {
   const [isCreatingNewWbs, setIsCreatingNewWbs] = useState(false);
   const [newWbsName, setNewWbsName] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
+  const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
 
   const validation = useMemo(() => validationFor(rows, uploadedColumns), [rows, uploadedColumns]);
   const badge = statusBadge(validation.status);
   const canSave = rows.length > 0 && validation.status === "valid";
   const canSaveNewWbs = canSave && newWbsName.trim().length > 0;
+
+  useEffect(() => {
+    setMilestones(projectId ? loadWbsMilestones(projectId) : []);
+  }, [projectId]);
 
   useEffect(() => {
     let alive = true;
@@ -385,6 +399,22 @@ export default function WbsSetupPage() {
     setRows((current) => current.filter((row) => row.clientId !== clientId));
   }
 
+  function addMilestone() {
+    setMilestones((current) => [...current, createMilestone()]);
+  }
+
+  function updateMilestone(id: string, field: "label" | "date", value: string) {
+    setMilestones((current) => current.map((milestone) => (milestone.id === id ? { ...milestone, [field]: value } : milestone)));
+  }
+
+  function deleteMilestone(id: string) {
+    setMilestones((current) => current.filter((milestone) => milestone.id !== id));
+  }
+
+  function validMilestones() {
+    return milestones.filter((milestone) => milestone.label.trim() && milestone.date.trim());
+  }
+
   function moveRow(sourceClientId: string, targetClientId: string) {
     if (sourceClientId === targetClientId) return;
     setRows((current) => {
@@ -452,6 +482,7 @@ export default function WbsSetupPage() {
       }
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
+      saveWbsMilestones(targetProjectId, validMilestones());
       setIsCreatingNewWbs(false);
       setNewWbsName("");
       setMessage("WBS가 저장되었습니다.");
@@ -598,6 +629,13 @@ export default function WbsSetupPage() {
             </section>
           )}
 
+          <MilestoneSettings
+            milestones={milestones}
+            onAdd={addMilestone}
+            onDelete={deleteMilestone}
+            onUpdate={updateMilestone}
+          />
+
           <EditableWbsTable
             rows={rows}
             validation={validation}
@@ -708,6 +746,66 @@ function StartOption({
         <p className="mt-1 text-[12.5px] leading-5 text-zinc-500">{description}</p>
       </div>
       <div className="mt-4">{action}</div>
+    </section>
+  );
+}
+
+function MilestoneSettings({
+  milestones,
+  onAdd,
+  onDelete,
+  onUpdate
+}: {
+  milestones: WbsMilestone[];
+  onAdd: () => void;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, field: "label" | "date", value: string) => void;
+}) {
+  return (
+    <section className="mt-5 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+            <CalendarDays className="h-3.5 w-3.5 text-zinc-500" />
+            마일스톤
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">간트 차트에 Today 선처럼 표시할 주요 날짜를 입력합니다.</p>
+        </div>
+        <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAdd}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          마일스톤 추가
+        </Button>
+      </div>
+      {milestones.length === 0 ? (
+        <div className="px-4 py-5 text-[12.5px] text-zinc-500">아직 등록된 마일스톤이 없습니다.</div>
+      ) : (
+        <div className="divide-y divide-zinc-100">
+          {milestones.map((milestone) => (
+            <div key={milestone.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(220px,1fr)_180px_36px]">
+              <Input
+                value={milestone.label}
+                onChange={(event) => onUpdate(milestone.id, "label", event.target.value)}
+                placeholder="예: MVP 릴리즈"
+                className="h-9 rounded-lg border-zinc-200 text-[12.5px] shadow-none"
+              />
+              <Input
+                type="date"
+                value={milestone.date}
+                onChange={(event) => onUpdate(milestone.id, "date", event.target.value)}
+                className="h-9 rounded-lg border-zinc-200 text-[12.5px] shadow-none"
+              />
+              <button
+                type="button"
+                onClick={() => onDelete(milestone.id)}
+                className="grid h-9 w-9 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
+                aria-label="마일스톤 삭제"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
