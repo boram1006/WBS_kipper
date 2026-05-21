@@ -13,7 +13,6 @@ import {
   GitBranch,
   Info,
   Search,
-  Sparkles,
   Table2,
   UserRound,
   X,
@@ -261,7 +260,10 @@ export default function CurrentWbsPage() {
       const matchesQuery =
         !needle ||
         [row.wbsId, row.taskName, row.owner, row.description, row.notes].some((value) => value.toLowerCase().includes(needle));
-      const matchesStatus = statusFilter === "all" || row.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        row.status === statusFilter ||
+        (statusFilter === "__delayed" && (statusBucket(row.status) === "delayed" || row.badges.includes("schedule")));
       const matchesOwner = ownerFilter === "all" || row.owner === ownerFilter;
       const matchesChangeType = changeTypeFilter === "all" || row.badges.includes(changeTypeFilter as WbsBadge);
       return matchesQuery && matchesStatus && matchesOwner && matchesChangeType;
@@ -274,33 +276,30 @@ export default function CurrentWbsPage() {
       total: rows.length,
       progress: rows.filter((row) => statusBucket(row.status) === "progress").length,
       completed: rows.filter((row) => statusBucket(row.status) === "completed").length,
-      delayed: rows.filter((row) => statusBucket(row.status) === "delayed").length,
-      recent: rows.filter((row) => row.badges.includes("recent")).length
+      delayed: rows.filter((row) => statusBucket(row.status) === "delayed" || row.badges.includes("schedule")).length
     }),
     [rows]
   );
   const activeSummaryFilter =
-    statusFilter === "all" && changeTypeFilter === "recent"
-      ? "recent"
-      : statusFilter === "all" && changeTypeFilter === "all"
+    statusFilter === "all" && changeTypeFilter === "all"
         ? "total"
       : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "progress")
           ? "progress"
           : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "completed")
             ? "completed"
-            : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "delayed")
+            : statusFilter === "__delayed" || statusOptions.find((status) => statusFilter === status && statusBucket(status) === "delayed")
               ? "delayed"
               : null;
 
-  function applySummaryFilter(filter: "total" | "progress" | "completed" | "delayed" | "recent") {
-    if (filter === "total" || filter === "recent") {
+  function applySummaryFilter(filter: "total" | "progress" | "completed" | "delayed") {
+    if (filter === "total") {
       setStatusFilter("all");
-      setChangeTypeFilter(filter === "recent" ? "recent" : "all");
+      setChangeTypeFilter("all");
       return;
     }
     setChangeTypeFilter("all");
     const matchingStatus = statusOptions.find((status) => status !== "all" && statusBucket(status) === filter);
-    setStatusFilter(matchingStatus ?? "all");
+    setStatusFilter(filter === "delayed" ? matchingStatus ?? "__delayed" : matchingStatus ?? "all");
   }
 
   function downloadCsv() {
@@ -356,12 +355,11 @@ export default function CurrentWbsPage() {
                   </div>
                 )}
 
-                <section className="grid grid-cols-5 gap-3">
+                <section className="grid grid-cols-4 gap-3">
                   <SummaryCard icon={Table2} label="Total Tasks" value={summary.total} tone="neutral" active={activeSummaryFilter === "total"} onClick={() => applySummaryFilter("total")} />
                   <SummaryCard icon={Clock3} label="In Progress" value={summary.progress} tone="progress" active={activeSummaryFilter === "progress"} onClick={() => applySummaryFilter("progress")} />
                   <SummaryCard icon={CheckCircle2} label="Completed" value={summary.completed} tone="completed" active={activeSummaryFilter === "completed"} onClick={() => applySummaryFilter("completed")} />
                   <SummaryCard icon={AlertCircle} label="Delayed" value={summary.delayed} tone="delayed" active={activeSummaryFilter === "delayed"} onClick={() => applySummaryFilter("delayed")} />
-                  <SummaryCard icon={Sparkles} label="Recently Updated" value={summary.recent} tone="recent" active={activeSummaryFilter === "recent"} onClick={() => applySummaryFilter("recent")} />
                 </section>
 
                 <GanttChart
@@ -468,7 +466,7 @@ function SummaryCard({
   icon: LucideIcon;
   label: string;
   value: number;
-  tone: "neutral" | "progress" | "completed" | "delayed" | "recent";
+  tone: "neutral" | "progress" | "completed" | "delayed";
   active?: boolean;
   onClick: () => void;
 }) {
@@ -476,22 +474,13 @@ function SummaryCard({
     neutral: "border-zinc-200 bg-zinc-50 text-zinc-600",
     progress: "border-sky-200 bg-sky-50 text-sky-700",
     completed: "border-zinc-300 bg-zinc-100 text-zinc-600",
-    delayed: "border-rose-200 bg-rose-50 text-rose-700",
-    recent: "border-violet-200 bg-violet-50 text-violet-700"
+    delayed: "border-rose-200 bg-rose-50 text-rose-700"
   }[tone];
   const activeClass = {
     neutral: "border-zinc-500 ring-zinc-200",
     progress: "border-sky-500 ring-sky-100",
     completed: "border-zinc-500 ring-zinc-200",
-    delayed: "border-rose-500 ring-rose-100",
-    recent: "border-violet-500 ring-violet-100"
-  }[tone];
-  const activeBarClass = {
-    neutral: "bg-zinc-500",
-    progress: "bg-sky-500",
-    completed: "bg-zinc-500",
-    delayed: "bg-rose-500",
-    recent: "bg-violet-500"
+    delayed: "border-rose-500 ring-rose-100"
   }[tone];
   return (
     <button
@@ -502,7 +491,6 @@ function SummaryCard({
         active ? cn("bg-white ring-2", activeClass) : "border-zinc-200"
       )}
     >
-      {active && <span className={cn("absolute inset-y-0 left-0 w-1", activeBarClass)} />}
       <div className="flex items-center justify-between">
         <span className={cn("grid h-7 w-7 place-items-center rounded-lg border", toneClass, active && "shadow-sm")}>
           <Icon className="h-3.5 w-3.5" />
