@@ -189,7 +189,6 @@ export default function CurrentWbsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const [recentOnly, setRecentOnly] = useState(false);
   const [changeTypeFilter, setChangeTypeFilter] = useState<(typeof changeTypeOptions)[number]["value"]>("all");
   const [showCompletedInGantt, setShowCompletedInGantt] = useState(true);
   const [ganttHeight, setGanttHeight] = useState(320);
@@ -258,11 +257,10 @@ export default function CurrentWbsPage() {
         [row.wbsId, row.taskName, row.owner, row.description, row.notes].some((value) => value.toLowerCase().includes(needle));
       const matchesStatus = statusFilter === "all" || row.status === statusFilter;
       const matchesOwner = ownerFilter === "all" || row.owner === ownerFilter;
-      const matchesRecent = !recentOnly || row.badges.includes("recent");
       const matchesChangeType = changeTypeFilter === "all" || row.badges.includes(changeTypeFilter as WbsBadge);
-      return matchesQuery && matchesStatus && matchesOwner && matchesRecent && matchesChangeType;
+      return matchesQuery && matchesStatus && matchesOwner && matchesChangeType;
     });
-  }, [changeTypeFilter, ownerFilter, query, recentOnly, rows, statusFilter]);
+  }, [changeTypeFilter, ownerFilter, query, rows, statusFilter]);
 
   const activeRow = activeId ? rows.find((row) => row.wbsId === activeId) ?? null : null;
   const summary = useMemo(
@@ -276,11 +274,11 @@ export default function CurrentWbsPage() {
     [rows]
   );
   const activeSummaryFilter =
-    statusFilter === "all" && !recentOnly
-      ? "total"
-      : recentOnly
-        ? "recent"
-        : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "progress")
+    statusFilter === "all" && changeTypeFilter === "recent"
+      ? "recent"
+      : statusFilter === "all" && changeTypeFilter === "all"
+        ? "total"
+      : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "progress")
           ? "progress"
           : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "completed")
             ? "completed"
@@ -289,11 +287,12 @@ export default function CurrentWbsPage() {
               : null;
 
   function applySummaryFilter(filter: "total" | "progress" | "completed" | "delayed" | "recent") {
-    setRecentOnly(filter === "recent");
     if (filter === "total" || filter === "recent") {
       setStatusFilter("all");
+      setChangeTypeFilter(filter === "recent" ? "recent" : "all");
       return;
     }
+    setChangeTypeFilter("all");
     const matchingStatus = statusOptions.find((status) => status !== "all" && statusBucket(status) === filter);
     setStatusFilter(matchingStatus ?? "all");
   }
@@ -388,10 +387,6 @@ export default function CurrentWbsPage() {
                       labels={Object.fromEntries(changeTypeOptions.map((item) => [item.value, item.label]))}
                       allLabel="All change types"
                     />
-                    <label className="flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-[12px] font-medium text-zinc-700">
-                      <Switch checked={recentOnly} onCheckedChange={setRecentOnly} />
-                      Recently updated
-                    </label>
                   </div>
 
                   <div className="overflow-hidden">
