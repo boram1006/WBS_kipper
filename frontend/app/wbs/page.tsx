@@ -170,6 +170,12 @@ function formatShortDate(time: number) {
   return new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit" }).format(new Date(time));
 }
 
+function timelineLabelClass(left: number) {
+  if (left < 8) return "translate-x-0 text-left";
+  if (left > 92) return "-translate-x-full text-right";
+  return "-translate-x-1/2 text-center";
+}
+
 function statusBucket(status: string) {
   const text = status.toLowerCase();
   if (text.includes("완료") || text.includes("done") || text.includes("complete")) return "completed";
@@ -566,8 +572,13 @@ function GanttChart({
               {validMilestones.map((milestone) => {
                 const left = Math.max(0, Math.min(100, ((toTime(milestone.date)! - min) / span) * 100));
                 return (
-                  <span key={milestone.id} className="absolute -top-0.5 max-w-[96px] -translate-x-1/2 truncate rounded bg-white px-1 text-center text-[10px] font-semibold text-violet-700" style={{ left: `${left}%` }}>
-                    {milestone.label}
+                  <span
+                    key={milestone.id}
+                    className={cn("absolute -top-0.5 max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold text-violet-700", timelineLabelClass(left))}
+                    style={{ left: `${left}%` }}
+                    title={`${formatShortDate(toTime(milestone.date)!)} · ${milestone.label}`}
+                  >
+                    {formatShortDate(toTime(milestone.date)!)} · {milestone.label}
                   </span>
                 );
               })}
