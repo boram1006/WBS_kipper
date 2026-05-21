@@ -355,17 +355,17 @@ export default function MeetingNotePage() {
                 title="회의록 원문"
                 description="회의록을 그대로 붙여 넣으세요. 결정 사항, 일정, 담당자, 리스크, 후속 확인 항목을 중심으로 분석합니다."
                 action={
-                  <div className="flex items-center gap-1.5">
-                    <Button type="button" variant="outline" className="h-7 whitespace-nowrap rounded-lg px-2 text-[10.5px] leading-none" onClick={loadSample}>
-                      <FileText className="mr-1 h-3 w-3" />
+                  <div className="flex items-center gap-1">
+                    <Button type="button" variant="outline" className="h-6 whitespace-nowrap rounded-md px-1.5 text-[9.5px] leading-none" onClick={loadSample}>
+                      <FileText className="mr-1 h-2.5 w-2.5" />
                       샘플 불러오기
                     </Button>
-                    <Button type="button" variant="outline" className="h-7 whitespace-nowrap rounded-lg px-2 text-[10.5px] leading-none">
-                      <Upload className="mr-1 h-3 w-3" />
+                    <Button type="button" variant="outline" className="h-6 whitespace-nowrap rounded-md px-1.5 text-[9.5px] leading-none">
+                      <Upload className="mr-1 h-2.5 w-2.5" />
                       회의록 업로드
                     </Button>
-                    <Button type="button" variant="ghost" className="h-7 whitespace-nowrap rounded-lg px-2 text-[10.5px] leading-none text-zinc-500" onClick={clearNote}>
-                      <Trash2 className="mr-1 h-3 w-3" />
+                    <Button type="button" variant="ghost" className="h-6 whitespace-nowrap rounded-md px-1.5 text-[9.5px] leading-none text-zinc-500" onClick={clearNote}>
+                      <Trash2 className="mr-1 h-2.5 w-2.5" />
                       지우기
                     </Button>
                   </div>
