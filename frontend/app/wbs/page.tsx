@@ -550,10 +550,10 @@ function GanttChart({
           <p className="mt-1 text-xs text-zinc-500">빨간 기준선은 오늘 날짜입니다.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end">
-          <label className="flex h-7 items-center gap-1.5 text-[11.5px] font-medium text-zinc-700">
-            <Switch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} className="h-4 w-8 border-zinc-300 [&>span]:h-3 [&>span]:w-3 [&>span]:translate-x-0.5 data-[state=checked]:[&>span]:translate-x-4" />
+          <div className="flex h-7 items-center gap-2 text-[11.5px] font-medium text-zinc-700">
             <span>완료 숨김</span>
-          </label>
+            <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
+          </div>
         </div>
       </div>
       {!range ? (
@@ -720,6 +720,28 @@ function DrawerSection({ title, children }: { title: string; children: ReactNode
 function StatusBadge({ badge }: { badge: WbsBadge }) {
   const config = badgeConfig[badge];
   return <span className={cn("inline-flex rounded border px-1.5 py-0.5 text-[10.5px] font-semibold", config.className)}>{config.label}</span>;
+}
+
+function MiniSwitch({ checked, onCheckedChange }: { checked: boolean; onCheckedChange: (checked: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onCheckedChange(!checked)}
+      className={cn(
+        "relative inline-flex h-4 w-8 shrink-0 items-center rounded-full border transition-colors",
+        checked ? "border-zinc-900 bg-zinc-900" : "border-zinc-300 bg-zinc-100"
+      )}
+    >
+      <span
+        className={cn(
+          "pointer-events-none h-3 w-3 rounded-full bg-white shadow-sm transition-transform",
+          checked ? "translate-x-[17px]" : "translate-x-0.5"
+        )}
+      />
+    </button>
+  );
 }
 
 function DependencyCell({
