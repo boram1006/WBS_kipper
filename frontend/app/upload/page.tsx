@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
-  ArrowRight,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -262,21 +261,33 @@ export default function WbsSetupPage() {
 
   useEffect(() => {
     let alive = true;
+    function showSavedSnapshot(snapshot: { rows_preview: Record<string, string>[] }) {
+      setRows(editableRowsFromRaw(snapshot.rows_preview));
+      setUploadedColumns([...STANDARD_COLUMN_KEYS]);
+      setFileName("Saved WBS");
+      setIsCreatingNewWbs(false);
+      setNewWbsName("");
+    }
+
     async function loadExistingWbs() {
       if (!projectId) {
         setLoadingExisting(false);
         return;
       }
-      setLoadingExisting(true);
+      const cached = loadWbsSnapshot(projectId);
+      if (cached?.rows_preview?.length) {
+        showSavedSnapshot(cached);
+        setMessage(null);
+        setLoadingExisting(false);
+      } else {
+        setLoadingExisting(true);
+      }
       try {
         const snapshot = await api.getWbs(projectId);
         if (!alive) return;
         if (snapshot.rows_preview.length > 0) {
-          setRows(editableRowsFromRaw(snapshot.rows_preview));
-          setUploadedColumns([...STANDARD_COLUMN_KEYS]);
-          setFileName("Saved WBS");
-          setIsCreatingNewWbs(false);
-          setNewWbsName("");
+          showSavedSnapshot(snapshot);
+          setMessage(null);
           saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
         } else {
           setRows([]);
@@ -287,13 +298,7 @@ export default function WbsSetupPage() {
         }
       } catch {
         if (!alive) return;
-        const cached = loadWbsSnapshot(projectId);
         if (cached?.rows_preview?.length) {
-          setRows(editableRowsFromRaw(cached.rows_preview));
-          setUploadedColumns([...STANDARD_COLUMN_KEYS]);
-          setFileName("Saved WBS");
-          setIsCreatingNewWbs(false);
-          setNewWbsName("");
           setMessage("서버 WBS를 바로 불러오지 못해 브라우저에 저장된 WBS를 표시했습니다.");
         } else {
           setRows([]);
@@ -677,10 +682,6 @@ export default function WbsSetupPage() {
               <Button variant="outline" className="h-9 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={() => void saveWbs(false)} disabled={saving}>
                 <Table2 className="mr-1.5 h-3.5 w-3.5" />
                 {isCreatingNewWbs ? "새 WBS 저장" : "WBS 저장"}
-              </Button>
-              <Button className="h-[34px] rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={() => void saveWbs(true)} disabled={saving}>
-                회의록 분석으로 계속
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             </div>
           </div>

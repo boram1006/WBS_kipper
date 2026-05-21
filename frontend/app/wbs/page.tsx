@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -13,7 +13,6 @@ import {
   FileDown,
   GitBranch,
   Info,
-  Maximize2,
   Search,
   Sparkles,
   Table2,
@@ -519,6 +518,21 @@ function GanttChart({
   const span = Math.max(max - min, 24 * 60 * 60 * 1000);
   const todayLeft = Math.max(0, Math.min(100, ((todayTime - min) / span) * 100));
   const completedCount = rows.filter((row) => statusBucket(row.status) === "completed").length;
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = height;
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const nextHeight = Math.max(240, Math.min(760, startHeight + moveEvent.clientY - startY));
+      onHeightChange(nextHeight);
+    };
+    const onPointerUp = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  }
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -537,20 +551,6 @@ function GanttChart({
             완료 숨김
             {completedCount > 0 && <span className="text-zinc-400">({completedCount})</span>}
           </label>
-          <label className="flex h-8 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-[11.5px] font-medium text-zinc-700">
-            <Maximize2 className="h-3.5 w-3.5 text-zinc-500" />
-            높이
-            <input
-              type="range"
-              min={240}
-              max={720}
-              step={40}
-              value={height}
-              onChange={(event) => onHeightChange(Number(event.target.value))}
-              className="w-28 accent-zinc-900"
-            />
-            <span className="w-10 text-right text-zinc-400">{height}px</span>
-          </label>
           {range && (
             <span className="text-[11px] font-medium text-zinc-400">
               {formatShortDate(min)} - {formatShortDate(max)}
@@ -561,6 +561,7 @@ function GanttChart({
       {!range ? (
         <div className="px-6 py-10 text-center text-sm text-zinc-500">시작일과 마감일이 있는 WBS를 저장하면 간트 차트가 표시됩니다.</div>
       ) : (
+        <>
         <div className="overflow-auto px-4 py-3" style={{ height }}>
           <div className="mb-2 grid grid-cols-[180px_1fr_90px] gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400">
             <span>Task</span>
@@ -572,7 +573,7 @@ function GanttChart({
               {validMilestones.map((milestone) => {
                 const left = Math.max(0, Math.min(100, ((toTime(milestone.date)! - min) / span) * 100));
                 return (
-                  <span key={milestone.id} className="absolute top-4 -translate-x-1/2 text-[10px] font-semibold text-violet-700" style={{ left: `${left}%` }}>
+                  <span key={milestone.id} className="absolute -top-0.5 max-w-[96px] -translate-x-1/2 truncate rounded bg-white px-1 text-center text-[10px] font-semibold text-violet-700" style={{ left: `${left}%` }}>
                     {milestone.label}
                   </span>
                 );
@@ -625,6 +626,15 @@ function GanttChart({
             )}
           </div>
         </div>
+        <div
+          role="separator"
+          aria-label="간트 차트 높이 조절"
+          onPointerDown={startResize}
+          className="group flex h-4 cursor-row-resize items-center justify-center border-t border-zinc-100 bg-white hover:bg-zinc-50"
+        >
+          <span className="h-1 w-12 rounded-full bg-zinc-300 transition-colors group-hover:bg-zinc-500" />
+        </div>
+        </>
       )}
     </section>
   );
