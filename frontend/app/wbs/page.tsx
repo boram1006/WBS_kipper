@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Clock3,
   Download,
-  EyeOff,
   FileDown,
   GitBranch,
   Info,
@@ -524,7 +523,6 @@ function GanttChart({
   const max = range ? Math.max(range.max, todayTime) : todayTime;
   const span = Math.max(max - min, 24 * 60 * 60 * 1000);
   const todayLeft = Math.max(0, Math.min(100, ((todayTime - min) / span) * 100));
-  const completedCount = rows.filter((row) => statusBucket(row.status) === "completed").length;
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
     const startY = event.clientY;
@@ -551,18 +549,11 @@ function GanttChart({
           </h2>
           <p className="mt-1 text-xs text-zinc-500">빨간 기준선은 오늘 날짜입니다.</p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <label className="flex h-8 items-center gap-1.5 text-[11.5px] font-medium text-zinc-700">
-            <Switch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} className="h-5 w-9 [&>span]:h-3.5 [&>span]:w-3.5 data-[state=checked]:[&>span]:translate-x-4" />
-            <EyeOff className="h-3.5 w-3.5 text-zinc-500" />
+        <div className="flex flex-wrap items-center justify-end">
+          <label className="flex h-7 items-center gap-1.5 text-[11.5px] font-medium text-zinc-700">
+            <Switch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} className="h-4 w-8 border-zinc-300 [&>span]:h-3 [&>span]:w-3 [&>span]:translate-x-0.5 data-[state=checked]:[&>span]:translate-x-4" />
             <span>완료 숨김</span>
-            {completedCount > 0 && <span className="ml-0.5 text-zinc-400">({completedCount})</span>}
           </label>
-          {range && (
-            <span className="text-[11px] font-medium text-zinc-400">
-              {formatShortDate(min)} - {formatShortDate(max)}
-            </span>
-          )}
         </div>
       </div>
       {!range ? (
@@ -570,7 +561,7 @@ function GanttChart({
       ) : (
         <>
         <div className="overflow-auto px-4 py-3" style={{ height }}>
-          <div className="mb-2 grid grid-cols-[180px_1fr_90px] gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400">
+          <div className="mb-2 grid grid-cols-[220px_1fr] gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400">
             <span>Task</span>
             <div className="relative flex justify-between">
               <span>{formatShortDate(min)}</span>
@@ -587,7 +578,6 @@ function GanttChart({
               })}
               <span>{formatShortDate(max)}</span>
             </div>
-            <span>Status</span>
           </div>
           <div className="space-y-2">
             {visibleRows.map((row) => {
@@ -596,9 +586,12 @@ function GanttChart({
               const left = Math.max(0, Math.min(100, ((start - min) / span) * 100));
               const width = Math.max(3, Math.min(100 - left, ((Math.max(due, start) - start) / span) * 100));
               return (
-                <div key={row.wbsId} className="grid grid-cols-[180px_1fr_90px] items-center gap-3 text-[12px]">
+                <div key={row.wbsId} className="grid grid-cols-[220px_1fr] items-center gap-3 text-[12px]">
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
+                      <span className={cn("shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
+                    </div>
                     <p className="font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
                   </div>
                   <div className="relative h-8 rounded-lg bg-zinc-100">
@@ -622,7 +615,6 @@ function GanttChart({
                       style={{ left: `${left}%`, width: `${width}%` }}
                     />
                   </div>
-                  <span className={cn("truncate rounded-md border px-2 py-1 text-center text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
                 </div>
               );
             })}
