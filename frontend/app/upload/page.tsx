@@ -858,7 +858,7 @@ function EditableWbsTable({
         </div>
       ) : (
         <div className="overflow-auto">
-          <table className="min-w-[1460px] w-full border-collapse text-left text-[12px]">
+          <table className="min-w-[1360px] w-full border-collapse text-left text-[12px]">
             <thead className="bg-zinc-50 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
               <tr className="border-b border-zinc-200">
                 <th className="w-10 px-3 py-3">#</th>
@@ -870,9 +870,8 @@ function EditableWbsTable({
                 <th className="w-[140px] px-2 py-3">start_date</th>
                 <th className="w-[140px] px-2 py-3">due_date*</th>
                 <th className="w-[110px] px-2 py-3">status*</th>
-                <th className="w-[130px] px-2 py-3">dependency</th>
+                <th className="w-[210px] px-2 py-3">dependency</th>
                 <th className="w-[210px] px-2 py-3">notes</th>
-                <th className="w-[100px] px-2 py-3">validation</th>
                 <th className="w-12 px-2 py-3" />
               </tr>
             </thead>
@@ -944,21 +943,15 @@ function EditableWbsTable({
                       </select>
                     </td>
                     <td className="px-2 py-2">
-                      <CellInput value={row.dependency} placeholder="예: 1.1" onChange={(value) => onUpdate(row.clientId, "dependency", value)} />
+                      <DependencySelect
+                        value={row.dependency}
+                        rows={rows}
+                        currentClientId={row.clientId}
+                        onChange={(value) => onUpdate(row.clientId, "dependency", value)}
+                      />
                     </td>
                     <td className="px-2 py-2">
                       <CellInput value={row.notes} onChange={(value) => onUpdate(row.clientId, "notes", value)} />
-                    </td>
-                    <td className="px-2 py-2">
-                      {hasError ? (
-                        <Badge variant="warning" className="border border-amber-200">
-                          수정 필요
-                        </Badge>
-                      ) : (
-                        <Badge variant="success" className="border border-emerald-200">
-                          정상
-                        </Badge>
-                      )}
                     </td>
                     <td className="px-2 py-2">
                       <button
@@ -1002,6 +995,42 @@ function CellInput({
       onChange={(event) => onChange(event.target.value)}
       className={cn("h-8 rounded-md border-zinc-200 px-2 text-[12px] shadow-none focus-visible:ring-1", invalid && "border-amber-400 bg-amber-50")}
     />
+  );
+}
+
+function DependencySelect({
+  value,
+  rows,
+  currentClientId,
+  onChange
+}: {
+  value: string;
+  rows: WbsEditableRow[];
+  currentClientId: string;
+  onChange: (value: string) => void;
+}) {
+  const options = rows
+    .filter((row) => row.clientId !== currentClientId && row.wbs_id.trim())
+    .map((row) => ({
+      value: row.wbs_id.trim(),
+      label: `${row.wbs_id.trim()}${row.task_name.trim() ? ` · ${row.task_name.trim()}` : ""}`
+    }));
+  const hasCurrentValue = value && !options.some((option) => option.value === value);
+
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12px] font-medium text-zinc-800 outline-none focus:border-zinc-400"
+    >
+      <option value="">선행 작업 없음</option>
+      {hasCurrentValue && <option value={value}>{value}</option>}
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
