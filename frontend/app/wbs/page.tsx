@@ -479,17 +479,32 @@ function SummaryCard({
     delayed: "border-rose-200 bg-rose-50 text-rose-700",
     recent: "border-violet-200 bg-violet-50 text-violet-700"
   }[tone];
+  const activeClass = {
+    neutral: "border-zinc-500 ring-zinc-200",
+    progress: "border-sky-500 ring-sky-100",
+    completed: "border-zinc-500 ring-zinc-200",
+    delayed: "border-rose-500 ring-rose-100",
+    recent: "border-violet-500 ring-violet-100"
+  }[tone];
+  const activeBarClass = {
+    neutral: "bg-zinc-500",
+    progress: "bg-sky-500",
+    completed: "bg-zinc-500",
+    delayed: "bg-rose-500",
+    recent: "bg-violet-500"
+  }[tone];
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-xl border bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-zinc-300 hover:bg-zinc-50",
-        active ? "border-zinc-300 bg-zinc-50 shadow-[inset_0_0_0_1px_rgba(113,113,122,0.18)]" : "border-zinc-200"
+        "relative overflow-hidden rounded-xl border bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-zinc-300 hover:bg-zinc-50",
+        active ? cn("bg-white ring-2", activeClass) : "border-zinc-200"
       )}
     >
+      {active && <span className={cn("absolute inset-y-0 left-0 w-1", activeBarClass)} />}
       <div className="flex items-center justify-between">
-        <span className={cn("grid h-7 w-7 place-items-center rounded-lg border", toneClass)}>
+        <span className={cn("grid h-7 w-7 place-items-center rounded-lg border", toneClass, active && "shadow-sm")}>
           <Icon className="h-3.5 w-3.5" />
         </span>
         <span className="text-[22px] font-semibold tracking-[-0.03em] text-zinc-950">{value}</span>
@@ -576,9 +591,9 @@ function GanttChart({
                     key={milestone.id}
                     className={cn("absolute -top-0.5 max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold text-violet-700", timelineLabelClass(left))}
                     style={{ left: `${left}%` }}
-                    title={`${formatShortDate(toTime(milestone.date)!)} · ${milestone.label}`}
+                    title={`${milestone.label} (${formatShortDate(toTime(milestone.date)!)})`}
                   >
-                    {formatShortDate(toTime(milestone.date)!)} · {milestone.label}
+                    {milestone.label} ({formatShortDate(toTime(milestone.date)!)})
                   </span>
                 );
               })}
