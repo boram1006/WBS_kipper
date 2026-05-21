@@ -249,6 +249,7 @@ export default function CurrentWbsPage() {
 
   const statusOptions = useMemo(() => ["all", ...Array.from(new Set(rows.map((row) => row.status).filter(Boolean)))], [rows]);
   const ownerOptions = useMemo(() => ["all", ...Array.from(new Set(rows.map((row) => row.owner).filter(Boolean)))], [rows]);
+  const rowByWbsId = useMemo(() => new Map(rows.map((row) => [row.wbsId, row])), [rows]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -305,7 +306,7 @@ export default function CurrentWbsPage() {
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
-      <AppSidebar projectId={projectId} pendingCount={8} />
+      <AppSidebar projectId={projectId} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="shrink-0 border-b border-zinc-200 bg-white px-8 pb-6 pt-5">
           <div className="flex flex-wrap items-end justify-between gap-5">
@@ -430,7 +431,13 @@ export default function CurrentWbsPage() {
                             <Td>
                               <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status}</span>
                             </Td>
-                            <Td>{row.dependency}</Td>
+                            <Td>
+                              <DependencyCell
+                                dependency={row.dependency}
+                                dependencyRow={rowByWbsId.get(row.dependency)}
+                                onSelect={(wbsId) => setActiveId(wbsId)}
+                              />
+                            </Td>
                             <Td>{row.lastUpdated}</Td>
                           </tr>
                         ))}
@@ -545,11 +552,11 @@ function GanttChart({
           <p className="mt-1 text-xs text-zinc-500">빨간 기준선은 오늘 날짜입니다.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <label className="flex h-8 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-[11.5px] font-medium text-zinc-700">
-            <Switch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
+          <label className="flex h-8 items-center gap-1.5 text-[11.5px] font-medium text-zinc-700">
+            <Switch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} className="h-5 w-9 [&>span]:h-3.5 [&>span]:w-3.5 data-[state=checked]:[&>span]:translate-x-4" />
             <EyeOff className="h-3.5 w-3.5 text-zinc-500" />
-            완료 숨김
-            {completedCount > 0 && <span className="text-zinc-400">({completedCount})</span>}
+            <span>완료 숨김</span>
+            {completedCount > 0 && <span className="ml-0.5 text-zinc-400">({completedCount})</span>}
           </label>
           {range && (
             <span className="text-[11px] font-medium text-zinc-400">
@@ -721,6 +728,39 @@ function DrawerSection({ title, children }: { title: string; children: ReactNode
 function StatusBadge({ badge }: { badge: WbsBadge }) {
   const config = badgeConfig[badge];
   return <span className={cn("inline-flex rounded border px-1.5 py-0.5 text-[10.5px] font-semibold", config.className)}>{config.label}</span>;
+}
+
+function DependencyCell({
+  dependency,
+  dependencyRow,
+  onSelect
+}: {
+  dependency: string;
+  dependencyRow?: WbsRow;
+  onSelect: (wbsId: string) => void;
+}) {
+  if (!dependency || dependency === "-") return <span className="text-zinc-400">-</span>;
+  if (!dependencyRow) {
+    return (
+      <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[11px] font-semibold text-amber-800">
+        {dependency}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(dependencyRow.wbsId);
+      }}
+      className="group inline-flex max-w-[220px] items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-left text-[11px] text-sky-800 hover:border-sky-300 hover:bg-sky-100"
+      title={`${dependencyRow.wbsId} · ${dependencyRow.taskName}`}
+    >
+      <span className="shrink-0 font-mono font-semibold">{dependencyRow.wbsId}</span>
+      <span className="truncate text-sky-700 group-hover:text-sky-900">{dependencyRow.taskName}</span>
+    </button>
+  );
 }
 
 function FilterSelect({

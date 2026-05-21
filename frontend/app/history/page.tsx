@@ -149,7 +149,7 @@ export default function HistoryPage() {
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
-      <AppSidebar projectId={projectId} pendingCount={8} />
+      <AppSidebar projectId={projectId} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="shrink-0 border-b border-zinc-200 bg-white px-8 pb-6 pt-5">
           <div className="flex flex-wrap items-end justify-between gap-5">
