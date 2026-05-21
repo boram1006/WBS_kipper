@@ -47,7 +47,6 @@ PRD 업데이트 및 공유, 전체 일정표 작성, 각 담당 세부 일정 �
 const schema = z.object({
   meeting_date: z.string().min(1, "회의 날짜를 입력해 주세요."),
   meeting_title: z.string().min(1, "회의 제목을 입력해 주세요."),
-  attendees: z.string().optional(),
   meeting_note: z.string().min(10, "회의록을 10자 이상 입력해 주세요.")
 });
 
@@ -120,7 +119,6 @@ export default function MeetingNotePage() {
     defaultValues: {
       meeting_date: new Date().toISOString().slice(0, 10),
       meeting_title: "",
-      attendees: "",
       meeting_note: ""
     }
   });
@@ -128,7 +126,6 @@ export default function MeetingNotePage() {
   const note = form.watch("meeting_note");
   const meetingDate = form.watch("meeting_date");
   const meetingTitle = form.watch("meeting_title");
-  const attendees = form.watch("attendees");
 
   const noteStats = useMemo(() => {
     const trimmed = note.trim();
@@ -291,7 +288,7 @@ export default function MeetingNotePage() {
                 title="회의 정보"
                 description="분석 결과와 변경 이력에 연결할 회의 기본 정보를 입력하세요."
               >
-                <div className="grid gap-3 p-4 pb-0 md:grid-cols-[1fr_180px]">
+                <div className="grid gap-3 p-4 md:grid-cols-[1fr_180px]">
                   <Field label="회의 제목" required error={form.formState.errors.meeting_title?.message}>
                     <Input className="h-9 rounded-lg border-zinc-200 text-[12.5px]" {...form.register("meeting_title")} />
                   </Field>
@@ -299,21 +296,6 @@ export default function MeetingNotePage() {
                     <Input className="h-9 rounded-lg border-zinc-200 text-[12.5px]" type="date" {...form.register("meeting_date")} />
                   </Field>
                 </div>
-                <div className="grid gap-3 p-4 pt-3 md:grid-cols-1">
-                  <Field label="참석자">
-                    <Input className="h-9 rounded-lg border-zinc-200 text-[12.5px]" {...form.register("attendees")} />
-                  </Field>
-                </div>
-                {attendees && (
-                  <div className="flex flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-3">
-                    {attendees.split(",").filter(Boolean).map((name) => (
-                      <span key={name.trim()} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-700">
-                        <span className="grid h-4 w-4 place-items-center rounded-full bg-zinc-950 text-[8px] text-white">{name.trim().slice(0, 1)}</span>
-                        {name.trim()}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </Panel>
 
               <Panel
@@ -373,17 +355,17 @@ export default function MeetingNotePage() {
                 title="회의록 원문"
                 description="회의록을 그대로 붙여 넣으세요. 결정 사항, 일정, 담당자, 리스크, 후속 확인 항목을 중심으로 분석합니다."
                 action={
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]" onClick={loadSample}>
-                      <FileText className="mr-1.5 h-3.5 w-3.5" />
+                  <div className="flex items-center gap-1.5">
+                    <Button type="button" variant="outline" className="h-7 whitespace-nowrap rounded-lg px-2 text-[10.5px] leading-none" onClick={loadSample}>
+                      <FileText className="mr-1 h-3 w-3" />
                       샘플 불러오기
                     </Button>
-                    <Button type="button" variant="outline" className="h-7 rounded-lg px-2.5 text-[11.5px]">
-                      <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    <Button type="button" variant="outline" className="h-7 whitespace-nowrap rounded-lg px-2 text-[10.5px] leading-none">
+                      <Upload className="mr-1 h-3 w-3" />
                       회의록 업로드
                     </Button>
-                    <Button type="button" variant="ghost" className="h-7 rounded-lg px-2.5 text-[11.5px] text-zinc-500" onClick={clearNote}>
-                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    <Button type="button" variant="ghost" className="h-7 whitespace-nowrap rounded-lg px-2 text-[10.5px] leading-none text-zinc-500" onClick={clearNote}>
+                      <Trash2 className="mr-1 h-3 w-3" />
                       지우기
                     </Button>
                   </div>
