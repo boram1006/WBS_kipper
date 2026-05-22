@@ -10,12 +10,15 @@ import type { ProjectResponse } from "@/lib/types";
 type Props = {
   projectId: string;
   onChange: (projectId: string) => void;
+  onNewWbs?: () => void;
   allowCreate?: boolean;
   preferDefaultProject?: boolean;
 };
 
 function projectLabel(project: ProjectResponse) {
-  return project.name?.trim() || "webOS UX";
+  const name = project.name?.trim();
+  if (!name || name === "WBS 설정 프로젝트" || /^Project #\d+$/i.test(name)) return "webOS UX";
+  return name;
 }
 
 function uniqueProjectsByName(projects: ProjectResponse[], selectedProjectId: string) {
@@ -30,7 +33,7 @@ function uniqueProjectsByName(projects: ProjectResponse[], selectedProjectId: st
   return Array.from(byName.values());
 }
 
-export function ProjectSelector({ projectId, onChange, allowCreate = true, preferDefaultProject = false }: Props) {
+export function ProjectSelector({ projectId, onChange, onNewWbs, allowCreate = true, preferDefaultProject = false }: Props) {
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -83,7 +86,13 @@ export function ProjectSelector({ projectId, onChange, allowCreate = true, prefe
     <div className="flex flex-wrap items-center gap-2">
       <select
         value={projectId}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          if (event.target.value === "__new_wbs__") {
+            onNewWbs?.();
+            return;
+          }
+          onChange(event.target.value);
+        }}
         className="h-8 min-w-[220px] rounded-lg border border-zinc-200 bg-white px-3 text-[12.5px] font-medium text-zinc-800 outline-none focus:border-zinc-400"
       >
         {!visibleProjects.some((project) => String(project.id) === projectId) && <option value={projectId}>webOS UX</option>}
@@ -92,6 +101,7 @@ export function ProjectSelector({ projectId, onChange, allowCreate = true, prefe
             {projectLabel(project)}
           </option>
         ))}
+        {onNewWbs && <option value="__new_wbs__">새 WBS</option>}
       </select>
 
       {allowCreate && !creating && (

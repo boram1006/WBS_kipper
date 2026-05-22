@@ -1,19 +1,26 @@
 "use client";
 
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Calendar,
   CheckCircle2,
   Clock3,
+  ClipboardList,
   Download,
+  Eye,
   FileDown,
   GitBranch,
   Info,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Save,
   Search,
   Table2,
+  Upload,
   UserRound,
   X,
   type LucideIcon
@@ -22,9 +29,9 @@ import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { ProjectSelector } from "@/components/project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
+import type { WbsColumnMapping } from "@/lib/types";
 import { useActiveProjectId } from "@/lib/use-project-id";
 import { loadWbsMilestones, loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
@@ -45,6 +52,10 @@ type WbsRow = {
 };
 
 type WbsBadge = "recent" | "new" | "schedule" | "owner" | "status" | "confirm";
+type ViewMode = "view" | "edit";
+type GanttZoom = "week" | "month";
+type PageMode = "wbs" | "new-wbs";
+type DragAction = "move" | "resize-left" | "resize-right";
 
 const badgeConfig: Record<WbsBadge, { label: string; className: string }> = {
   recent: { label: "Recently updated", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
@@ -64,6 +75,146 @@ const changeTypeOptions = [
   { value: "status", label: "Status changed" },
   { value: "confirm", label: "Needs confirmation" }
 ] as const;
+
+const STANDARD_COLUMNS = ["wbs_id", "task_name", "description", "owner", "start_date", "due_date", "status", "dependency", "notes"] as const;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function createWbsRow(
+  wbsId: string,
+  taskName: string,
+  description = "",
+  owner = "미정",
+  startDate = "-",
+  dueDate = "-",
+  status = "예정",
+  dependency = "",
+  notes = ""
+): WbsRow {
+  return {
+    wbsId,
+    taskName,
+    description,
+    owner,
+    startDate,
+    dueDate,
+    status,
+    dependency: dependency || "-",
+    lastUpdated: "-",
+    badges: [],
+    notes,
+    taskSource: "WBS 현황에서 생성한 작업"
+  };
+}
+
+const SAMPLE_WBS_ROWS: WbsRow[] = [
+  createWbsRow("1.1", "Requirements review", "Define UX and implementation scope.", "PM", "2026-05-20", "2026-05-22", "진행중", "", "Sample row"),
+  createWbsRow("1.2", "Scenario design", "Draft the key user scenarios.", "UX", "2026-05-23", "2026-05-27", "예정", "1.1", ""),
+  createWbsRow("1.3", "Prototype build", "Create working UI prototype.", "Design", "2026-05-28", "2026-06-03", "예정", "1.2", ""),
+  createWbsRow("1.4", "QA review", "Validate core flow and edge cases.", "QA", "2026-06-04", "2026-06-07", "예정", "1.3", "")
+];
+
+const STANDARD_MAPPING = {
+  id: "wbs_id",
+  task_name: "task_name",
+  description: "description",
+  owner: "owner",
+  start_date: "start_date",
+  due_date: "due_date",
+  status: "status",
+  dependency: "dependency",
+  notes: "notes"
+} satisfies WbsColumnMapping;
+
+function escapeCsv(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function rowsToCsv(rows: WbsRow[]) {
+  const body = rows.map((row) =>
+    [
+      row.wbsId,
+      row.taskName,
+      row.description,
+      row.owner,
+      normalizeDateValue(row.startDate),
+      normalizeDateValue(row.dueDate),
+      row.status,
+      row.dependency === "-" ? "" : row.dependency,
+      row.notes
+    ]
+      .map((value) => escapeCsv(String(value ?? "")))
+      .join(",")
+  );
+  return [STANDARD_COLUMNS.join(","), ...body].join("\r\n");
+}
+
+function csvFileFromRows(rows: WbsRow[]) {
+  return new File([`\uFEFF${rowsToCsv(rows)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
+}
+
+async function uploadAndMapStandardWbs(projectId: string, rows: WbsRow[]) {
+  const snapshot = await api.uploadWbs(projectId, csvFileFromRows(rows));
+  await api.mapWbsColumns(projectId, STANDARD_MAPPING);
+  return snapshot;
+}
+
+function normalizeDateValue(value: string) {
+  return value && value !== "-" ? value : "";
+}
+
+function formatDateInputValue(value: string) {
+  return normalizeDateValue(value);
+}
+
+function isValidDateValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && toTime(value) != null;
+}
+
+function addDays(value: string, days: number) {
+  const time = toTime(value);
+  if (time == null) return value;
+  const date = new Date(time + days * DAY_MS);
+  return date.toISOString().slice(0, 10);
+}
+
+function daysBetween(startDate: string, dueDate: string) {
+  const start = toTime(startDate);
+  const due = toTime(dueDate);
+  if (start == null || due == null) return 0;
+  return Math.max(0, Math.round((due - start) / DAY_MS));
+}
+
+function hasKnownDates(row: WbsRow) {
+  return isValidDateValue(row.startDate) && isValidDateValue(row.dueDate);
+}
+
+function clampResizeDate(action: Exclude<DragAction, "move">, originalStartDate: string, originalDueDate: string, deltaDays: number) {
+  const durationDays = daysBetween(originalStartDate, originalDueDate);
+  if (action === "resize-left") {
+    return {
+      startDate: addDays(originalStartDate, Math.min(deltaDays, durationDays)),
+      dueDate: originalDueDate
+    };
+  }
+  return {
+    startDate: originalStartDate,
+    dueDate: addDays(originalDueDate, Math.max(deltaDays, -durationDays))
+  };
+}
+
+function rowFingerprint(row: WbsRow) {
+  return JSON.stringify({
+    wbsId: row.wbsId,
+    taskName: row.taskName,
+    description: row.description,
+    owner: row.owner,
+    startDate: normalizeDateValue(row.startDate),
+    dueDate: normalizeDateValue(row.dueDate),
+    status: row.status,
+    dependency: row.dependency,
+    notes: row.notes
+  });
+}
 
 function parseCsv(text: string) {
   const rows: string[][] = [];
@@ -145,6 +296,11 @@ function rowsFromCsv(csv: string): WbsRow[] {
   return normalizeRawRows(rawRows);
 }
 
+function wbsRowsFromCsvText(csv: string) {
+  const rows = rowsFromCsv(csv);
+  return rows.length ? rows : [];
+}
+
 function toTime(value: string) {
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : null;
@@ -186,17 +342,29 @@ function statusBucket(status: string) {
 export default function CurrentWbsPage() {
   const [projectId, setProjectId] = useActiveProjectId();
   const router = useRouter();
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [rows, setRows] = useState<WbsRow[]>([]);
+  const [savedRows, setSavedRows] = useState<WbsRow[]>([]);
+  const [draftNewRows, setDraftNewRows] = useState<WbsRow[]>(SAMPLE_WBS_ROWS);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [mode, setMode] = useState<ViewMode>("view");
+  const [pageMode, setPageMode] = useState<PageMode>("wbs");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [creatingWbs, setCreatingWbs] = useState(false);
+  const [selectorVersion, setSelectorVersion] = useState(0);
   const [dataSource, setDataSource] = useState<"api" | "cache">("api");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [newWbsName, setNewWbsName] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [changeTypeFilter, setChangeTypeFilter] = useState<(typeof changeTypeOptions)[number]["value"]>("all");
   const [showCompletedInGantt, setShowCompletedInGantt] = useState(true);
   const [ganttHeight, setGanttHeight] = useState(320);
+  const [ganttZoom, setGanttZoom] = useState<GanttZoom>("week");
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
 
   useEffect(() => {
@@ -208,10 +376,14 @@ export default function CurrentWbsPage() {
     async function load() {
       const cached = loadWbsSnapshot(projectId);
       if (cached?.rows_preview?.length) {
-        setRows(normalizeRawRows(cached.rows_preview, cached.mapping));
+        const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping);
+        setRows(cachedRows);
+        setSavedRows(cachedRows);
         setActiveId(null);
+        setMode("view");
         setDataSource("cache");
         setError(null);
+        setMessage(null);
         setLoading(false);
       } else {
         setLoading(true);
@@ -223,20 +395,27 @@ export default function CurrentWbsPage() {
         const parsed = normalizeRawRows(snapshot.rows_preview);
         if (!alive) return;
         setRows(parsed);
+        setSavedRows(parsed);
         setActiveId(null);
+        setMode("view");
         setDataSource("api");
+        setMessage(null);
         saveWbsSnapshot(projectId, snapshot);
       } catch (err) {
         if (!alive) return;
         if (cached?.rows_preview?.length) {
           const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping);
           setRows(cachedRows);
+          setSavedRows(cachedRows);
           setActiveId(null);
+          setMode("view");
           setDataSource("cache");
           setError("서버에서 최신 WBS를 불러오지 못해 이 브라우저에 저장된 WBS를 표시합니다.");
         } else {
           setRows([]);
+          setSavedRows([]);
           setActiveId(null);
+          setMode("view");
           setDataSource("api");
           setError(err instanceof Error ? err.message : "저장된 WBS를 불러오지 못했습니다. WBS 설정에서 먼저 저장해 주세요.");
         }
@@ -253,6 +432,11 @@ export default function CurrentWbsPage() {
   const statusOptions = useMemo(() => ["all", ...Array.from(new Set(rows.map((row) => row.status).filter(Boolean)))], [rows]);
   const ownerOptions = useMemo(() => ["all", ...Array.from(new Set(rows.map((row) => row.owner).filter(Boolean)))], [rows]);
   const rowByWbsId = useMemo(() => new Map(rows.map((row) => [row.wbsId, row])), [rows]);
+  const savedFingerprintByWbsId = useMemo(() => new Map(savedRows.map((row) => [row.wbsId, rowFingerprint(row)])), [savedRows]);
+  const modifiedIds = useMemo(() => {
+    return new Set(rows.filter((row) => savedFingerprintByWbsId.get(row.wbsId) !== rowFingerprint(row)).map((row) => row.wbsId));
+  }, [rows, savedFingerprintByWbsId]);
+  const unsavedCount = modifiedIds.size;
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -307,6 +491,123 @@ export default function CurrentWbsPage() {
     window.location.href = api.downloadWbsUrl(projectId);
   }
 
+  function updateRowDates(wbsId: string, dates: Partial<Pick<WbsRow, "startDate" | "dueDate">>) {
+    setRows((current) => current.map((row) => (row.wbsId === wbsId ? { ...row, ...dates } : row)));
+  }
+
+  function enterEditMode() {
+    setMode("edit");
+    setMessage(null);
+    setError(null);
+  }
+
+  function resetChanges() {
+    setRows(savedRows);
+    setMessage("변경사항을 마지막 저장 상태로 되돌렸습니다.");
+    setError(null);
+  }
+
+  function cancelEdit() {
+    if (unsavedCount > 0 && !window.confirm("저장하지 않은 변경사항이 있습니다. 변경사항을 버리고 View mode로 돌아갈까요?")) {
+      return;
+    }
+    setRows(savedRows);
+    setMode("view");
+    setHoveredId(null);
+    setMessage(null);
+    setError(null);
+  }
+
+  async function saveWbs() {
+    if (!projectId || saving || unsavedCount === 0) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const snapshot = await uploadAndMapStandardWbs(projectId, rows);
+      saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
+      const parsed = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING);
+      setRows(parsed);
+      setSavedRows(parsed);
+      setMode("view");
+      setMessage("WBS 변경사항이 저장되었습니다.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "WBS 변경사항을 저장하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function enterNewWbsMode(rowsForDraft = SAMPLE_WBS_ROWS) {
+    setPageMode("new-wbs");
+    setMode("view");
+    setDraftNewRows(rowsForDraft);
+    setNewWbsName("");
+    setMessage(null);
+    setError(null);
+  }
+
+  function downloadTemplate() {
+    const url = URL.createObjectURL(csvFileFromRows(SAMPLE_WBS_ROWS));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "wbs-standard-template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleNewWbsUpload(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsedRows = wbsRowsFromCsvText(String(reader.result ?? ""));
+      if (!parsedRows.length) {
+        setError("업로드한 템플릿에서 WBS 행을 찾지 못했습니다.");
+        return;
+      }
+      setDraftNewRows(parsedRows);
+      setError(null);
+      setMessage(`${parsedRows.length}개 작업을 새 WBS 초안으로 불러왔습니다.`);
+    };
+    reader.onerror = () => setError("템플릿 파일을 읽지 못했습니다.");
+    reader.readAsText(file);
+  }
+
+  async function createNewWbsFromDraft() {
+    const name = newWbsName.trim();
+    if (!name) {
+      setError("새 WBS 이름을 입력해 주세요.");
+      return;
+    }
+    if (!draftNewRows.length) {
+      setError("새 WBS에 저장할 작업이 없습니다.");
+      return;
+    }
+    setCreatingWbs(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const project = await api.createProject({ name, description: "Created from WBS Status." });
+      const nextProjectId = String(project.id);
+      const snapshot = await uploadAndMapStandardWbs(nextProjectId, draftNewRows);
+      saveWbsSnapshot(nextProjectId, snapshot, STANDARD_MAPPING);
+      const parsedRows = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING);
+      setProjectId(nextProjectId);
+      setRows(parsedRows);
+      setSavedRows(parsedRows);
+      setActiveId(null);
+      setHoveredId(null);
+      setPageMode("wbs");
+      setMode("view");
+      setSelectorVersion((current) => current + 1);
+      setMessage(`새 WBS "${name}"이 생성되었습니다.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "새 WBS를 생성하지 못했습니다.");
+    } finally {
+      setCreatingWbs(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
       <AppSidebar projectId={projectId} />
@@ -331,7 +632,37 @@ export default function CurrentWbsPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} preferDefaultProject />
+              {mode === "edit" && (
+                <span className="inline-flex h-8 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-800">
+                  {unsavedCount} unsaved change{unsavedCount === 1 ? "" : "s"}
+                </span>
+              )}
+              <ProjectSelector key={selectorVersion} projectId={projectId} onChange={setProjectId} onNewWbs={() => enterNewWbsMode()} allowCreate={false} preferDefaultProject />
+              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={() => enterNewWbsMode()}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                New WBS
+              </Button>
+              {mode === "view" ? (
+                <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={enterEditMode}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Edit WBS
+                </Button>
+              ) : (
+                <>
+                  <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={saveWbs} disabled={saving || unsavedCount === 0}>
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                    {saving ? "Saving..." : "Save WBS"}
+                  </Button>
+                  <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={resetChanges} disabled={saving || unsavedCount === 0}>
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    Reset changes
+                  </Button>
+                  <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={cancelEdit} disabled={saving}>
+                    <Eye className="mr-1.5 h-3.5 w-3.5" />
+                    Cancel edit
+                  </Button>
+                </>
+              )}
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadCsv} disabled={!projectId}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download CSV
@@ -341,7 +672,33 @@ export default function CurrentWbsPage() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-auto px-8 py-5">
-          {loading ? (
+          {pageMode === "new-wbs" ? (
+            <NewWbsPanel
+              name={newWbsName}
+              rows={draftNewRows}
+              creating={creatingWbs}
+              uploadInputRef={uploadInputRef}
+              onNameChange={setNewWbsName}
+              onUseSample={() => {
+                setDraftNewRows(SAMPLE_WBS_ROWS);
+                setMessage("샘플 WBS가 새 WBS 초안으로 준비되었습니다.");
+                setError(null);
+              }}
+              onUseEmpty={() => {
+                setDraftNewRows([createWbsRow("1.1", "", "", "", "-", "-", "예정", "", "")]);
+                setMessage("빈 WBS 초안을 만들었습니다. 생성 후 Edit mode에서 날짜를 입력할 수 있습니다.");
+                setError(null);
+              }}
+              onDownloadTemplate={downloadTemplate}
+              onUploadTemplate={handleNewWbsUpload}
+              onCreate={createNewWbsFromDraft}
+              onCancel={() => {
+                setPageMode("wbs");
+                setMessage(null);
+                setError(null);
+              }}
+            />
+          ) : loading ? (
             <LoadingState />
           ) : rows.length === 0 ? (
             <EmptyState onImport={() => router.push(routes.upload(projectId))} />
@@ -352,6 +709,12 @@ export default function CurrentWbsPage() {
                   <div className={cn("flex items-start gap-2 rounded-xl border px-4 py-3 text-[12px] leading-5", dataSource === "cache" ? "border-sky-200 bg-sky-50 text-sky-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>{error}</span>
+                  </div>
+                )}
+                {message && (
+                  <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[12px] leading-5 text-emerald-800">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{message}</span>
                   </div>
                 )}
 
@@ -367,8 +730,16 @@ export default function CurrentWbsPage() {
                   milestones={milestones}
                   height={ganttHeight}
                   showCompleted={showCompletedInGantt}
+                  mode={mode}
+                  zoom={ganttZoom}
+                  hoveredId={hoveredId}
+                  activeId={activeId}
                   onHeightChange={setGanttHeight}
                   onShowCompletedChange={setShowCompletedInGantt}
+                  onZoomChange={setGanttZoom}
+                  onHover={setHoveredId}
+                  onSelect={setActiveId}
+                  onRowDatesChange={updateRowDates}
                 />
 
                 <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -412,20 +783,43 @@ export default function CurrentWbsPage() {
                           <tr
                             key={row.wbsId}
                             onClick={() => setActiveId(row.wbsId)}
-                            className={cn("cursor-pointer border-b border-zinc-100 transition-colors hover:bg-zinc-50", activeRow?.wbsId === row.wbsId && "bg-zinc-50")}
+                            onMouseEnter={() => setHoveredId(row.wbsId)}
+                            onMouseLeave={() => setHoveredId(null)}
+                            className={cn(
+                              "cursor-pointer border-b border-zinc-100 transition-colors hover:bg-zinc-50",
+                              (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-sky-50/60"
+                            )}
                           >
                             <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
                             <Td>
                               <div className="font-semibold text-zinc-950">{row.taskName}</div>
                               <div className="mt-1 flex flex-wrap gap-1">
+                                {!hasKnownDates(row) && <DateUnknownBadge />}
+                                {modifiedIds.has(row.wbsId) && (
+                                  <span className="inline-flex rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-sky-800">
+                                    Modified
+                                  </span>
+                                )}
                                 {row.badges.map((badge) => (
                                   <StatusBadge key={badge} badge={badge} />
                                 ))}
                               </div>
                             </Td>
                             <Td>{row.owner}</Td>
-                            <Td>{row.startDate}</Td>
-                            <Td className={row.badges.includes("schedule") ? "font-semibold text-violet-700" : undefined}>{row.dueDate}</Td>
+                            <Td>
+                              {mode === "edit" ? (
+                                <DateCellInput value={row.startDate} onChange={(value) => updateRowDates(row.wbsId, { startDate: value || "-" })} />
+                              ) : (
+                                row.startDate
+                              )}
+                            </Td>
+                            <Td className={row.badges.includes("schedule") ? "font-semibold text-violet-700" : undefined}>
+                              {mode === "edit" ? (
+                                <DateCellInput value={row.dueDate} onChange={(value) => updateRowDates(row.wbsId, { dueDate: value || "-" })} />
+                              ) : (
+                                row.dueDate
+                              )}
+                            </Td>
                             <Td>
                               <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status}</span>
                             </Td>
@@ -502,20 +896,176 @@ function SummaryCard({
   );
 }
 
+function NewWbsPanel({
+  name,
+  rows,
+  creating,
+  uploadInputRef,
+  onNameChange,
+  onUseSample,
+  onUseEmpty,
+  onDownloadTemplate,
+  onUploadTemplate,
+  onCreate,
+  onCancel
+}: {
+  name: string;
+  rows: WbsRow[];
+  creating: boolean;
+  uploadInputRef: MutableRefObject<HTMLInputElement | null>;
+  onNameChange: (name: string) => void;
+  onUseSample: () => void;
+  onUseEmpty: () => void;
+  onDownloadTemplate: () => void;
+  onUploadTemplate: (file: File | null) => void;
+  onCreate: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <section className="mx-auto max-w-5xl space-y-4">
+      <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-sky-700">New WBS mode</p>
+            <h2 className="mt-1 text-lg font-semibold text-zinc-950">새 WBS 생성</h2>
+            <p className="mt-1 text-sm text-zinc-500">기존 WBS 선택 상태와 분리된 생성 화면입니다. 생성 후 새 WBS가 선택됩니다.</p>
+          </div>
+          <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+
+        <div className="mt-5 max-w-md">
+          <label className="text-xs font-semibold text-zinc-700" htmlFor="new-wbs-name">
+            새 WBS 이름
+          </label>
+          <Input
+            id="new-wbs-name"
+            value={name}
+            onChange={(event) => onNameChange(event.target.value)}
+            placeholder="예: webOS UX Sprint 2"
+            className="mt-2 h-9 rounded-lg border-zinc-200 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        <NewWbsActionCard icon={ClipboardList} title="샘플 WBS 사용" description="기본 샘플 일정으로 새 WBS 초안을 채웁니다." onClick={onUseSample} />
+        <NewWbsActionCard icon={Download} title="템플릿 다운로드" description="표준 CSV 템플릿을 내려받습니다." onClick={onDownloadTemplate} />
+        <NewWbsActionCard icon={Upload} title="표준 템플릿 업로드" description="작성한 CSV를 새 WBS 초안으로 불러옵니다." onClick={() => uploadInputRef.current?.click()} />
+        <NewWbsActionCard icon={Plus} title="빈 WBS로 시작" description="최소 1개 행의 빈 WBS 초안을 만듭니다." onClick={onUseEmpty} />
+      </div>
+
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(event) => {
+          onUploadTemplate(event.target.files?.[0] ?? null);
+          event.target.value = "";
+        }}
+      />
+
+      <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-950">초안 미리보기</h3>
+            <p className="mt-1 text-xs text-zinc-500">{rows.length}개 작업이 생성됩니다.</p>
+          </div>
+          <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" disabled={creating || !name.trim() || rows.length === 0} onClick={onCreate}>
+            {creating ? "Creating..." : "Create WBS"}
+          </Button>
+        </div>
+        <div className="overflow-auto">
+          <table className="w-full border-collapse text-left text-[12.5px]">
+            <thead className="bg-zinc-50 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
+              <tr className="border-b border-zinc-200">
+                <Th>WBS ID</Th>
+                <Th>Task name</Th>
+                <Th>Owner</Th>
+                <Th>Start date</Th>
+                <Th>Due date</Th>
+                <Th>Status</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={`${row.wbsId}-${index}`} className="border-b border-zinc-100">
+                  <Td className="font-mono font-semibold text-zinc-700">{row.wbsId || "-"}</Td>
+                  <Td>{row.taskName || "-"}</Td>
+                  <Td>{row.owner || "-"}</Td>
+                  <Td>{row.startDate || "-"}</Td>
+                  <Td>{row.dueDate || "-"}</Td>
+                  <Td>
+                    <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function NewWbsActionCard({
+  icon: Icon,
+  title,
+  description,
+  onClick
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border border-zinc-200 bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-sky-200 hover:bg-sky-50/40"
+    >
+      <span className="grid h-8 w-8 place-items-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-600">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="mt-3 block text-sm font-semibold text-zinc-950">{title}</span>
+      <span className="mt-1 block text-xs leading-5 text-zinc-500">{description}</span>
+    </button>
+  );
+}
+
 function GanttChart({
   rows,
   milestones,
   height,
   showCompleted,
+  mode,
+  zoom,
+  hoveredId,
+  activeId,
   onHeightChange,
-  onShowCompletedChange
+  onShowCompletedChange,
+  onZoomChange,
+  onHover,
+  onSelect,
+  onRowDatesChange
 }: {
   rows: WbsRow[];
   milestones: WbsMilestone[];
   height: number;
   showCompleted: boolean;
+  mode: ViewMode;
+  zoom: GanttZoom;
+  hoveredId: string | null;
+  activeId: string | null;
   onHeightChange: (height: number) => void;
   onShowCompletedChange: (show: boolean) => void;
+  onZoomChange: (zoom: GanttZoom) => void;
+  onHover: (wbsId: string | null) => void;
+  onSelect: (wbsId: string) => void;
+  onRowDatesChange: (wbsId: string, dates: Partial<Pick<WbsRow, "startDate" | "dueDate">>) => void;
 }) {
   const visibleRows = showCompleted ? rows : rows.filter((row) => statusBucket(row.status) !== "completed");
   const validMilestones = milestones.filter((milestone) => toTime(milestone.date) != null);
@@ -523,10 +1073,73 @@ function GanttChart({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayTime = today.getTime();
-  const min = range ? Math.min(range.min, todayTime) : todayTime;
-  const max = range ? Math.max(range.max, todayTime) : todayTime;
-  const span = Math.max(max - min, 24 * 60 * 60 * 1000);
-  const todayLeft = Math.max(0, Math.min(100, ((todayTime - min) / span) * 100));
+  const min = (range ? Math.min(range.min, todayTime) : todayTime) - DAY_MS * 3;
+  const max = (range ? Math.max(range.max, todayTime) : todayTime) + DAY_MS * 7;
+  const totalDays = Math.max(1, Math.ceil((max - min) / DAY_MS));
+  const pxPerDay = zoom === "week" ? 36 : 14;
+  const timelineWidth = Math.max(720, totalDays * pxPerDay);
+  const todayLeft = Math.max(0, Math.min(timelineWidth, ((todayTime - min) / DAY_MS) * pxPerDay));
+  const tickEveryDays = zoom === "week" ? 7 : 30;
+  const ticks = Array.from({ length: Math.floor(totalDays / tickEveryDays) + 1 }, (_, index) => min + index * tickEveryDays * DAY_MS);
+  const [dragTooltip, setDragTooltip] = useState<{ wbsId: string; text: string; left: number; top: number } | null>(null);
+
+  function barGeometry(row: WbsRow) {
+    const start = toTime(row.startDate);
+    const due = toTime(row.dueDate);
+    if (start == null || due == null) return null;
+    const normalizedDue = Math.max(start, due);
+    return {
+      left: Math.max(0, ((start - min) / DAY_MS) * pxPerDay),
+      width: Math.max(24, ((normalizedDue - start) / DAY_MS + 1) * pxPerDay)
+    };
+  }
+
+  function startGanttDrag(event: ReactPointerEvent<HTMLElement>, row: WbsRow, action: DragAction) {
+    if (mode !== "edit" || !isValidDateValue(row.startDate) || !isValidDateValue(row.dueDate)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(row.wbsId);
+    const startX = event.clientX;
+    const barTop = event.currentTarget.getBoundingClientRect().top;
+    const originalStartDate = row.startDate;
+    const originalDueDate = row.dueDate;
+    let lastDeltaDays = 0;
+    const applyDelta = (deltaDays: number, clientX: number, clientY: number) => {
+      let nextStartDate = originalStartDate;
+      let nextDueDate = originalDueDate;
+      let tooltipText = "";
+      if (action === "move") {
+        nextStartDate = addDays(originalStartDate, deltaDays);
+        nextDueDate = addDays(originalDueDate, deltaDays);
+        tooltipText = `${originalStartDate} ~ ${originalDueDate} → ${nextStartDate} ~ ${nextDueDate}`;
+      } else {
+        const resized = clampResizeDate(action, originalStartDate, originalDueDate, deltaDays);
+        nextStartDate = resized.startDate;
+        nextDueDate = resized.dueDate;
+        tooltipText =
+          action === "resize-left"
+            ? `Start: ${originalStartDate} → ${nextStartDate}`
+            : `Due: ${originalDueDate} → ${nextDueDate}`;
+      }
+      onRowDatesChange(row.wbsId, { startDate: nextStartDate, dueDate: nextDueDate });
+      setDragTooltip({ wbsId: row.wbsId, text: tooltipText, left: clientX - startX, top: Math.max(-36, clientY - barTop - 42) });
+    };
+    applyDelta(0, event.clientX, event.clientY);
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const deltaDays = Math.round((moveEvent.clientX - startX) / pxPerDay);
+      if (deltaDays === lastDeltaDays) return;
+      lastDeltaDays = deltaDays;
+      applyDelta(deltaDays, moveEvent.clientX, moveEvent.clientY);
+    };
+    const onPointerUp = () => {
+      setDragTooltip(null);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  }
+
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
     const startY = event.clientY;
@@ -549,53 +1162,77 @@ function GanttChart({
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <Calendar className="h-3.5 w-3.5 text-zinc-500" />
-            WBS 간트 차트
+            WBS Gantt
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">빨간 기준선은 오늘 날짜입니다.</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            {mode === "edit" ? "Bar body moves the task. Edge handles resize start or due date." : "빨간 기준선은 오늘 날짜입니다."}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+            {(["week", "month"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => onZoomChange(item)}
+                className={cn(
+                  "rounded-md px-2.5 text-[11.5px] font-semibold capitalize transition-colors",
+                  zoom === item ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
+                )}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
           <div className="flex h-7 items-center gap-2 text-[11.5px] font-medium text-zinc-700">
             <span>완료 숨김</span>
             <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
           </div>
         </div>
       </div>
-      {!range ? (
-        <div className="px-6 py-10 text-center text-sm text-zinc-500">시작일과 마감일이 있는 WBS를 저장하면 간트 차트가 표시됩니다.</div>
+      {visibleRows.length === 0 ? (
+        <div className="px-6 py-10 text-center text-sm text-zinc-500">표시할 일정이 없습니다. 완료 숨김을 끄면 완료된 일정도 다시 표시됩니다.</div>
       ) : (
         <>
         <div className="overflow-auto px-4 py-3" style={{ height }}>
-          <div className="mb-2 grid grid-cols-[220px_1fr] gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400">
+          <div className="mb-2 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
             <span>Task</span>
-            <div className="relative flex justify-between">
-              <span>{formatShortDate(min)}</span>
-              <span className="absolute -top-0.5 -translate-x-1/2 text-[#fd312e]" style={{ left: `${todayLeft}%` }}>
+            <div className="relative h-5">
+              {ticks.map((tick) => (
+                <span key={tick} className="absolute top-0 -translate-x-1/2" style={{ left: `${((tick - min) / DAY_MS) * pxPerDay}px` }}>
+                  {formatShortDate(tick)}
+                </span>
+              ))}
+              <span className="absolute -top-0.5 -translate-x-1/2 text-[#fd312e]" style={{ left: `${todayLeft}px` }}>
                 Today ({formatShortDate(todayTime)})
               </span>
               {validMilestones.map((milestone) => {
-                const left = Math.max(0, Math.min(100, ((toTime(milestone.date)! - min) / span) * 100));
+                const left = Math.max(0, Math.min(timelineWidth, ((toTime(milestone.date)! - min) / DAY_MS) * pxPerDay));
                 return (
                   <span
                     key={milestone.id}
                     className={cn("absolute -top-0.5 max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold text-violet-700", timelineLabelClass(left))}
-                    style={{ left: `${left}%` }}
+                    style={{ left }}
                     title={`${milestone.label} (${formatShortDate(toTime(milestone.date)!)})`}
                   >
                     {milestone.label} ({formatShortDate(toTime(milestone.date)!)})
                   </span>
                 );
               })}
-              <span>{formatShortDate(max)}</span>
             </div>
           </div>
           <div className="space-y-2">
             {visibleRows.map((row) => {
-              const start = toTime(row.startDate) ?? min;
-              const due = toTime(row.dueDate) ?? start;
-              const left = Math.max(0, Math.min(100, ((start - min) / span) * 100));
-              const width = Math.max(3, Math.min(100 - left, ((Math.max(due, start) - start) / span) * 100));
+              const geometry = barGeometry(row);
+              const highlighted = hoveredId === row.wbsId || activeId === row.wbsId;
               return (
-                <div key={row.wbsId} className="grid grid-cols-[220px_1fr] items-center gap-3 text-[12px]">
+                <div
+                  key={row.wbsId}
+                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-sky-50/70")}
+                  style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}
+                  onMouseEnter={() => onHover(row.wbsId)}
+                  onMouseLeave={() => onHover(null)}
+                >
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
@@ -606,23 +1243,62 @@ function GanttChart({
                   <div className="relative h-8 rounded-lg bg-zinc-100">
                     <div
                       className="absolute bottom-0 top-0 z-10 w-px bg-[#fd312e]"
-                      style={{ left: `${todayLeft}%` }}
+                      style={{ left: `${todayLeft}px` }}
                     />
                     {validMilestones.map((milestone) => {
-                      const milestoneLeft = Math.max(0, Math.min(100, ((toTime(milestone.date)! - min) / span) * 100));
+                      const milestoneLeft = Math.max(0, Math.min(timelineWidth, ((toTime(milestone.date)! - min) / DAY_MS) * pxPerDay));
                       return (
                         <div
                           key={milestone.id}
                           className="absolute bottom-0 top-0 z-10 w-px bg-violet-500"
-                          style={{ left: `${milestoneLeft}%` }}
+                          style={{ left: `${milestoneLeft}px` }}
                           title={`${milestone.label} (${milestone.date})`}
                         />
                       );
                     })}
-                    <div
-                      className={cn("absolute top-1/2 h-3 -translate-y-1/2 rounded-full", ganttBarClass(row.status))}
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                    />
+                    {geometry ? (
+                      <div
+                        role={mode === "edit" ? "button" : undefined}
+                        tabIndex={mode === "edit" ? 0 : undefined}
+                        title={mode === "edit" ? "Drag to move task dates" : `${row.startDate} - ${row.dueDate}`}
+                        onPointerDown={(event) => startGanttDrag(event, row, "move")}
+                        onClick={() => onSelect(row.wbsId)}
+                        className={cn(
+                          "absolute top-1/2 h-4 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
+                          ganttBarClass(row.status),
+                          highlighted && "h-5 shadow-md ring-2 ring-sky-200",
+                          mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                        )}
+                        style={{ left: `${geometry.left}px`, width: `${geometry.width}px` }}
+                      >
+                        {mode === "edit" && (
+                          <>
+                            <span
+                              className="absolute left-0 top-1/2 h-5 w-2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-white/80 bg-white/70 shadow-sm"
+                              onPointerDown={(event) => startGanttDrag(event, row, "resize-left")}
+                              title="Resize start date"
+                            />
+                            <span
+                              className="absolute right-0 top-1/2 h-5 w-2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-white/80 bg-white/70 shadow-sm"
+                              onPointerDown={(event) => startGanttDrag(event, row, "resize-right")}
+                              title="Resize due date"
+                            />
+                            {dragTooltip?.wbsId === row.wbsId && (
+                              <span
+                                className="pointer-events-none absolute z-30 whitespace-nowrap rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-800 shadow-lg"
+                                style={{ left: `${Math.max(0, Math.min(geometry.width - 8, dragTooltip.left))}px`, top: `${dragTooltip.top}px` }}
+                              >
+                                {dragTooltip.text}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 rounded-md border border-dashed border-zinc-300 bg-white px-2 py-1 text-[11px] font-semibold text-zinc-500">
+                        날짜 미정
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -670,6 +1346,7 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
           <h3 className="text-lg font-semibold leading-6 tracking-tight text-zinc-950">{row.taskName}</h3>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
+            {!hasKnownDates(row) && <DateUnknownBadge />}
             {row.badges.map((badge) => (
               <StatusBadge key={badge} badge={badge} />
             ))}
@@ -731,6 +1408,10 @@ function StatusBadge({ badge }: { badge: WbsBadge }) {
   return <span className={cn("inline-flex rounded border px-1.5 py-0.5 text-[10.5px] font-semibold", config.className)}>{config.label}</span>;
 }
 
+function DateUnknownBadge() {
+  return <span className="inline-flex rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-zinc-600">날짜 미정</span>;
+}
+
 function MiniSwitch({ checked, onCheckedChange }: { checked: boolean; onCheckedChange: (checked: boolean) => void }) {
   return (
     <button
@@ -750,6 +1431,22 @@ function MiniSwitch({ checked, onCheckedChange }: { checked: boolean; onCheckedC
         )}
       />
     </button>
+  );
+}
+
+function DateCellInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const inputValue = formatDateInputValue(value);
+  return (
+    <input
+      type="date"
+      value={inputValue}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => onChange(event.target.value)}
+      className={cn(
+        "h-8 w-[140px] rounded-lg border bg-white px-2 text-[12px] font-medium text-zinc-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100",
+        inputValue && !isValidDateValue(inputValue) ? "border-rose-300" : "border-zinc-200"
+      )}
+    />
   );
 }
 
