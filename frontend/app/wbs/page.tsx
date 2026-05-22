@@ -940,11 +940,13 @@ function GanttChart({
                   onMouseLeave={() => onHover(null)}
                 >
                   <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
-                      <span className={cn("shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
+                    <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
+                    <div className="mt-0.5 flex min-w-0 items-center gap-2">
+                      <p className="shrink-0 font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
+                      <span className="min-w-0 truncate rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500">
+                        담당: {row.owner && row.owner !== "-" ? row.owner : "담당자 미정"}
+                      </span>
                     </div>
-                    <p className="font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
                   </div>
                   <div className="relative h-8 rounded-lg bg-zinc-100">
                     <div
