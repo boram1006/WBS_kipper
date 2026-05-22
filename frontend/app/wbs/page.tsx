@@ -1,26 +1,23 @@
 "use client";
 
-import type { MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Calendar,
   CheckCircle2,
   Clock3,
-  ClipboardList,
   Download,
   Eye,
   FileDown,
   GitBranch,
   Info,
   Pencil,
-  Plus,
   RotateCcw,
   Save,
   Search,
   Table2,
-  Upload,
   UserRound,
   X,
   type LucideIcon
@@ -54,7 +51,6 @@ type WbsRow = {
 type WbsBadge = "recent" | "new" | "schedule" | "owner" | "status" | "confirm";
 type ViewMode = "view" | "edit";
 type GanttZoom = "week" | "month";
-type PageMode = "wbs" | "new-wbs";
 type DragAction = "move" | "resize-left" | "resize-right";
 
 const badgeConfig: Record<WbsBadge, { label: string; className: string }> = {
@@ -78,40 +74,6 @@ const changeTypeOptions = [
 
 const STANDARD_COLUMNS = ["wbs_id", "task_name", "description", "owner", "start_date", "due_date", "status", "dependency", "notes"] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function createWbsRow(
-  wbsId: string,
-  taskName: string,
-  description = "",
-  owner = "미정",
-  startDate = "-",
-  dueDate = "-",
-  status = "예정",
-  dependency = "",
-  notes = ""
-): WbsRow {
-  return {
-    wbsId,
-    taskName,
-    description,
-    owner,
-    startDate,
-    dueDate,
-    status,
-    dependency: dependency || "-",
-    lastUpdated: "-",
-    badges: [],
-    notes,
-    taskSource: "WBS 현황에서 생성한 작업"
-  };
-}
-
-const SAMPLE_WBS_ROWS: WbsRow[] = [
-  createWbsRow("1.1", "Requirements review", "Define UX and implementation scope.", "PM", "2026-05-20", "2026-05-22", "진행중", "", "Sample row"),
-  createWbsRow("1.2", "Scenario design", "Draft the key user scenarios.", "UX", "2026-05-23", "2026-05-27", "예정", "1.1", ""),
-  createWbsRow("1.3", "Prototype build", "Create working UI prototype.", "Design", "2026-05-28", "2026-06-03", "예정", "1.2", ""),
-  createWbsRow("1.4", "QA review", "Validate core flow and edge cases.", "QA", "2026-06-04", "2026-06-07", "예정", "1.3", "")
-];
 
 const STANDARD_MAPPING = {
   id: "wbs_id",
@@ -216,38 +178,6 @@ function rowFingerprint(row: WbsRow) {
   });
 }
 
-function parseCsv(text: string) {
-  const rows: string[][] = [];
-  let cell = "";
-  let row: string[] = [];
-  let quoted = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-    if (char === '"' && quoted && next === '"') {
-      cell += '"';
-      index += 1;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      row.push(cell);
-      cell = "";
-    } else if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && next === "\n") index += 1;
-      row.push(cell);
-      if (row.some((value) => value.trim())) rows.push(row);
-      row = [];
-      cell = "";
-    } else {
-      cell += char;
-    }
-  }
-  row.push(cell);
-  if (row.some((value) => value.trim())) rows.push(row);
-  return rows;
-}
-
 function firstValue(row: Record<string, string>, keys: string[], fallback = "") {
   const normalized = Object.fromEntries(Object.entries(row).map(([key, value]) => [key.toLowerCase().trim(), value]));
   for (const key of keys) {
@@ -286,19 +216,6 @@ function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnap
       taskSource: inferTaskSource(raw)
     };
   });
-}
-
-function rowsFromCsv(csv: string): WbsRow[] {
-  const parsed = parseCsv(csv);
-  if (parsed.length < 2) return [];
-  const headers = parsed[0].map((header) => header.trim());
-  const rawRows = parsed.slice(1).map((values) => Object.fromEntries(headers.map((header, columnIndex) => [header, values[columnIndex] ?? ""])));
-  return normalizeRawRows(rawRows);
-}
-
-function wbsRowsFromCsvText(csv: string) {
-  const rows = rowsFromCsv(csv);
-  return rows.length ? rows : [];
 }
 
 function toTime(value: string) {
@@ -342,22 +259,16 @@ function statusBucket(status: string) {
 export default function CurrentWbsPage() {
   const [projectId, setProjectId] = useActiveProjectId();
   const router = useRouter();
-  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [rows, setRows] = useState<WbsRow[]>([]);
   const [savedRows, setSavedRows] = useState<WbsRow[]>([]);
-  const [draftNewRows, setDraftNewRows] = useState<WbsRow[]>(SAMPLE_WBS_ROWS);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("view");
-  const [pageMode, setPageMode] = useState<PageMode>("wbs");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creatingWbs, setCreatingWbs] = useState(false);
-  const [selectorVersion, setSelectorVersion] = useState(0);
   const [dataSource, setDataSource] = useState<"api" | "cache">("api");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [newWbsName, setNewWbsName] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -437,6 +348,10 @@ export default function CurrentWbsPage() {
     return new Set(rows.filter((row) => savedFingerprintByWbsId.get(row.wbsId) !== rowFingerprint(row)).map((row) => row.wbsId));
   }, [rows, savedFingerprintByWbsId]);
   const unsavedCount = modifiedIds.size;
+  const latestUpdatedLabel = useMemo(() => {
+    const values = rows.map((row) => row.lastUpdated).filter((value) => value && value !== "-");
+    return values[0] ?? "Not available";
+  }, [rows]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -497,6 +412,7 @@ export default function CurrentWbsPage() {
 
   function enterEditMode() {
     setMode("edit");
+    setActiveId(null);
     setMessage(null);
     setError(null);
   }
@@ -538,76 +454,6 @@ export default function CurrentWbsPage() {
     }
   }
 
-  function enterNewWbsMode(rowsForDraft = SAMPLE_WBS_ROWS) {
-    setPageMode("new-wbs");
-    setMode("view");
-    setDraftNewRows(rowsForDraft);
-    setNewWbsName("");
-    setMessage(null);
-    setError(null);
-  }
-
-  function downloadTemplate() {
-    const url = URL.createObjectURL(csvFileFromRows(SAMPLE_WBS_ROWS));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "wbs-standard-template.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleNewWbsUpload(file: File | null) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsedRows = wbsRowsFromCsvText(String(reader.result ?? ""));
-      if (!parsedRows.length) {
-        setError("업로드한 템플릿에서 WBS 행을 찾지 못했습니다.");
-        return;
-      }
-      setDraftNewRows(parsedRows);
-      setError(null);
-      setMessage(`${parsedRows.length}개 작업을 새 WBS 초안으로 불러왔습니다.`);
-    };
-    reader.onerror = () => setError("템플릿 파일을 읽지 못했습니다.");
-    reader.readAsText(file);
-  }
-
-  async function createNewWbsFromDraft() {
-    const name = newWbsName.trim();
-    if (!name) {
-      setError("새 WBS 이름을 입력해 주세요.");
-      return;
-    }
-    if (!draftNewRows.length) {
-      setError("새 WBS에 저장할 작업이 없습니다.");
-      return;
-    }
-    setCreatingWbs(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const project = await api.createProject({ name, description: "Created from WBS Status." });
-      const nextProjectId = String(project.id);
-      const snapshot = await uploadAndMapStandardWbs(nextProjectId, draftNewRows);
-      saveWbsSnapshot(nextProjectId, snapshot, STANDARD_MAPPING);
-      const parsedRows = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING);
-      setProjectId(nextProjectId);
-      setRows(parsedRows);
-      setSavedRows(parsedRows);
-      setActiveId(null);
-      setHoveredId(null);
-      setPageMode("wbs");
-      setMode("view");
-      setSelectorVersion((current) => current + 1);
-      setMessage(`새 WBS "${name}"이 생성되었습니다.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "새 WBS를 생성하지 못했습니다.");
-    } finally {
-      setCreatingWbs(false);
-    }
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex bg-[#fafaf9] font-sans text-zinc-950">
       <AppSidebar projectId={projectId} />
@@ -632,37 +478,10 @@ export default function CurrentWbsPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {mode === "edit" && (
-                <span className="inline-flex h-8 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-800">
-                  {unsavedCount} unsaved change{unsavedCount === 1 ? "" : "s"}
-                </span>
-              )}
-              <ProjectSelector key={selectorVersion} projectId={projectId} onChange={setProjectId} onNewWbs={() => enterNewWbsMode()} allowCreate={false} preferDefaultProject />
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={() => enterNewWbsMode()}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                New WBS
-              </Button>
-              {mode === "view" ? (
-                <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={enterEditMode}>
-                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                  Edit WBS
-                </Button>
-              ) : (
-                <>
-                  <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={saveWbs} disabled={saving || unsavedCount === 0}>
-                    <Save className="mr-1.5 h-3.5 w-3.5" />
-                    {saving ? "Saving..." : "Save WBS"}
-                  </Button>
-                  <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={resetChanges} disabled={saving || unsavedCount === 0}>
-                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                    Reset changes
-                  </Button>
-                  <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={cancelEdit} disabled={saving}>
-                    <Eye className="mr-1.5 h-3.5 w-3.5" />
-                    Cancel edit
-                  </Button>
-                </>
-              )}
+              <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} preferDefaultProject />
+              <span className="inline-flex h-8 items-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-500">
+                Last updated: <span className="ml-1 text-zinc-700">{latestUpdatedLabel}</span>
+              </span>
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadCsv} disabled={!projectId}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download CSV
@@ -672,38 +491,12 @@ export default function CurrentWbsPage() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-auto px-8 py-5">
-          {pageMode === "new-wbs" ? (
-            <NewWbsPanel
-              name={newWbsName}
-              rows={draftNewRows}
-              creating={creatingWbs}
-              uploadInputRef={uploadInputRef}
-              onNameChange={setNewWbsName}
-              onUseSample={() => {
-                setDraftNewRows(SAMPLE_WBS_ROWS);
-                setMessage("샘플 WBS가 새 WBS 초안으로 준비되었습니다.");
-                setError(null);
-              }}
-              onUseEmpty={() => {
-                setDraftNewRows([createWbsRow("1.1", "", "", "", "-", "-", "예정", "", "")]);
-                setMessage("빈 WBS 초안을 만들었습니다. 생성 후 Edit mode에서 날짜를 입력할 수 있습니다.");
-                setError(null);
-              }}
-              onDownloadTemplate={downloadTemplate}
-              onUploadTemplate={handleNewWbsUpload}
-              onCreate={createNewWbsFromDraft}
-              onCancel={() => {
-                setPageMode("wbs");
-                setMessage(null);
-                setError(null);
-              }}
-            />
-          ) : loading ? (
+          {loading ? (
             <LoadingState />
           ) : rows.length === 0 ? (
             <EmptyState onImport={() => router.push(routes.upload(projectId))} />
           ) : (
-            <div className={cn("grid gap-4", activeRow ? "grid-cols-[minmax(760px,1fr)_360px]" : "grid-cols-1")}>
+            <div className={cn("grid gap-4", activeRow && mode === "view" ? "grid-cols-[minmax(760px,1fr)_360px]" : "grid-cols-1")}>
               <div className="min-w-0 space-y-4">
                 {error && (
                   <div className={cn("flex items-start gap-2 rounded-xl border px-4 py-3 text-[12px] leading-5", dataSource === "cache" ? "border-sky-200 bg-sky-50 text-sky-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
@@ -734,12 +527,18 @@ export default function CurrentWbsPage() {
                   zoom={ganttZoom}
                   hoveredId={hoveredId}
                   activeId={activeId}
+                  unsavedCount={unsavedCount}
+                  saving={saving}
                   onHeightChange={setGanttHeight}
                   onShowCompletedChange={setShowCompletedInGantt}
                   onZoomChange={setGanttZoom}
                   onHover={setHoveredId}
                   onSelect={setActiveId}
                   onRowDatesChange={updateRowDates}
+                  onEnterEditMode={enterEditMode}
+                  onSave={saveWbs}
+                  onReset={resetChanges}
+                  onCancel={cancelEdit}
                 />
 
                 <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -782,11 +581,14 @@ export default function CurrentWbsPage() {
                         {filteredRows.map((row) => (
                           <tr
                             key={row.wbsId}
-                            onClick={() => setActiveId(row.wbsId)}
+                            onClick={() => {
+                              if (mode === "view") setActiveId(row.wbsId);
+                            }}
                             onMouseEnter={() => setHoveredId(row.wbsId)}
                             onMouseLeave={() => setHoveredId(null)}
                             className={cn(
-                              "cursor-pointer border-b border-zinc-100 transition-colors hover:bg-zinc-50",
+                              "border-b border-zinc-100 transition-colors hover:bg-zinc-50",
+                              mode === "view" ? "cursor-pointer" : "cursor-default",
                               (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-sky-50/60"
                             )}
                           >
@@ -840,7 +642,7 @@ export default function CurrentWbsPage() {
                 </section>
               </div>
 
-              {activeRow && <TaskDrawer row={activeRow} onClose={() => setActiveId(null)} />}
+              {activeRow && mode === "view" && <TaskDrawer row={activeRow} onClose={() => setActiveId(null)} />}
             </div>
           )}
         </main>
@@ -896,146 +698,6 @@ function SummaryCard({
   );
 }
 
-function NewWbsPanel({
-  name,
-  rows,
-  creating,
-  uploadInputRef,
-  onNameChange,
-  onUseSample,
-  onUseEmpty,
-  onDownloadTemplate,
-  onUploadTemplate,
-  onCreate,
-  onCancel
-}: {
-  name: string;
-  rows: WbsRow[];
-  creating: boolean;
-  uploadInputRef: MutableRefObject<HTMLInputElement | null>;
-  onNameChange: (name: string) => void;
-  onUseSample: () => void;
-  onUseEmpty: () => void;
-  onDownloadTemplate: () => void;
-  onUploadTemplate: (file: File | null) => void;
-  onCreate: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <section className="mx-auto max-w-5xl space-y-4">
-      <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-sky-700">New WBS mode</p>
-            <h2 className="mt-1 text-lg font-semibold text-zinc-950">새 WBS 생성</h2>
-            <p className="mt-1 text-sm text-zinc-500">기존 WBS 선택 상태와 분리된 생성 화면입니다. 생성 후 새 WBS가 선택됩니다.</p>
-          </div>
-          <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
-
-        <div className="mt-5 max-w-md">
-          <label className="text-xs font-semibold text-zinc-700" htmlFor="new-wbs-name">
-            새 WBS 이름
-          </label>
-          <Input
-            id="new-wbs-name"
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="예: webOS UX Sprint 2"
-            className="mt-2 h-9 rounded-lg border-zinc-200 text-sm"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-3">
-        <NewWbsActionCard icon={ClipboardList} title="샘플 WBS 사용" description="기본 샘플 일정으로 새 WBS 초안을 채웁니다." onClick={onUseSample} />
-        <NewWbsActionCard icon={Download} title="템플릿 다운로드" description="표준 CSV 템플릿을 내려받습니다." onClick={onDownloadTemplate} />
-        <NewWbsActionCard icon={Upload} title="표준 템플릿 업로드" description="작성한 CSV를 새 WBS 초안으로 불러옵니다." onClick={() => uploadInputRef.current?.click()} />
-        <NewWbsActionCard icon={Plus} title="빈 WBS로 시작" description="최소 1개 행의 빈 WBS 초안을 만듭니다." onClick={onUseEmpty} />
-      </div>
-
-      <input
-        ref={uploadInputRef}
-        type="file"
-        accept=".csv,text/csv"
-        className="hidden"
-        onChange={(event) => {
-          onUploadTemplate(event.target.files?.[0] ?? null);
-          event.target.value = "";
-        }}
-      />
-
-      <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-950">초안 미리보기</h3>
-            <p className="mt-1 text-xs text-zinc-500">{rows.length}개 작업이 생성됩니다.</p>
-          </div>
-          <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" disabled={creating || !name.trim() || rows.length === 0} onClick={onCreate}>
-            {creating ? "Creating..." : "Create WBS"}
-          </Button>
-        </div>
-        <div className="overflow-auto">
-          <table className="w-full border-collapse text-left text-[12.5px]">
-            <thead className="bg-zinc-50 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
-              <tr className="border-b border-zinc-200">
-                <Th>WBS ID</Th>
-                <Th>Task name</Th>
-                <Th>Owner</Th>
-                <Th>Start date</Th>
-                <Th>Due date</Th>
-                <Th>Status</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={`${row.wbsId}-${index}`} className="border-b border-zinc-100">
-                  <Td className="font-mono font-semibold text-zinc-700">{row.wbsId || "-"}</Td>
-                  <Td>{row.taskName || "-"}</Td>
-                  <Td>{row.owner || "-"}</Td>
-                  <Td>{row.startDate || "-"}</Td>
-                  <Td>{row.dueDate || "-"}</Td>
-                  <Td>
-                    <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </section>
-  );
-}
-
-function NewWbsActionCard({
-  icon: Icon,
-  title,
-  description,
-  onClick
-}: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-xl border border-zinc-200 bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-sky-200 hover:bg-sky-50/40"
-    >
-      <span className="grid h-8 w-8 place-items-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-600">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="mt-3 block text-sm font-semibold text-zinc-950">{title}</span>
-      <span className="mt-1 block text-xs leading-5 text-zinc-500">{description}</span>
-    </button>
-  );
-}
-
 function GanttChart({
   rows,
   milestones,
@@ -1045,12 +707,18 @@ function GanttChart({
   zoom,
   hoveredId,
   activeId,
+  unsavedCount,
+  saving,
   onHeightChange,
   onShowCompletedChange,
   onZoomChange,
   onHover,
   onSelect,
-  onRowDatesChange
+  onRowDatesChange,
+  onEnterEditMode,
+  onSave,
+  onReset,
+  onCancel
 }: {
   rows: WbsRow[];
   milestones: WbsMilestone[];
@@ -1060,12 +728,18 @@ function GanttChart({
   zoom: GanttZoom;
   hoveredId: string | null;
   activeId: string | null;
+  unsavedCount: number;
+  saving: boolean;
   onHeightChange: (height: number) => void;
   onShowCompletedChange: (show: boolean) => void;
   onZoomChange: (zoom: GanttZoom) => void;
   onHover: (wbsId: string | null) => void;
   onSelect: (wbsId: string) => void;
   onRowDatesChange: (wbsId: string, dates: Partial<Pick<WbsRow, "startDate" | "dueDate">>) => void;
+  onEnterEditMode: () => void;
+  onSave: () => void;
+  onReset: () => void;
+  onCancel: () => void;
 }) {
   const visibleRows = showCompleted ? rows : rows.filter((row) => statusBucket(row.status) !== "completed");
   const validMilestones = milestones.filter((milestone) => toTime(milestone.date) != null);
@@ -1098,7 +772,6 @@ function GanttChart({
     if (mode !== "edit" || !isValidDateValue(row.startDate) || !isValidDateValue(row.dueDate)) return;
     event.preventDefault();
     event.stopPropagation();
-    onSelect(row.wbsId);
     const startX = event.clientX;
     const barTop = event.currentTarget.getBoundingClientRect().top;
     const originalStartDate = row.startDate;
@@ -1162,13 +835,13 @@ function GanttChart({
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <Calendar className="h-3.5 w-3.5 text-zinc-500" />
-            WBS Gantt
+            일정 타임라인
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
             {mode === "edit" ? "Bar body moves the task. Edge handles resize start or due date." : "빨간 기준선은 오늘 날짜입니다."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
             {(["week", "month"] as const).map((item) => (
               <button
@@ -1188,6 +861,30 @@ function GanttChart({
             <span>완료 숨김</span>
             <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
           </div>
+          {mode === "view" ? (
+            <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onEnterEditMode}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              간트 일정 수정
+            </Button>
+          ) : (
+            <>
+              <span className="inline-flex h-8 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-800">
+                {unsavedCount} unsaved
+              </span>
+              <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onSave} disabled={saving || unsavedCount === 0}>
+                <Save className="mr-1.5 h-3.5 w-3.5" />
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onReset} disabled={saving || unsavedCount === 0}>
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                Reset
+              </Button>
+              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onCancel} disabled={saving}>
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
+                Cancel
+              </Button>
+            </>
+          )}
         </div>
       </div>
       {visibleRows.length === 0 ? (
@@ -1262,7 +959,10 @@ function GanttChart({
                         tabIndex={mode === "edit" ? 0 : undefined}
                         title={mode === "edit" ? "Drag to move task dates" : `${row.startDate} - ${row.dueDate}`}
                         onPointerDown={(event) => startGanttDrag(event, row, "move")}
-                        onClick={() => onSelect(row.wbsId)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (mode === "view") onSelect(row.wbsId);
+                        }}
                         className={cn(
                           "absolute top-1/2 h-4 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
                           ganttBarClass(row.status),
