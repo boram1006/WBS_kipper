@@ -831,60 +831,69 @@ function GanttChart({
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-        <div>
+      <div className="space-y-3 border-b border-zinc-100 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <Calendar className="h-3.5 w-3.5 text-zinc-500" />
             일정 타임라인
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            {mode === "edit" ? "Bar body moves the task. Edge handles resize start or due date." : "빨간 기준선은 오늘 날짜입니다."}
-          </p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {mode === "view" ? (
+              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onEnterEditMode}>
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                간트 일정 수정
+              </Button>
+            ) : (
+              <>
+                <span className="inline-flex h-8 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-800">
+                  {unsavedCount} unsaved
+                </span>
+                <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onReset} disabled={saving || unsavedCount === 0}>
+                  <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                  Reset
+                </Button>
+                <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onCancel} disabled={saving}>
+                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                  Cancel
+                </Button>
+                <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onSave} disabled={saving || unsavedCount === 0}>
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {saving ? "Saving..." : "Save changes"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
-            {(["week", "month"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => onZoomChange(item)}
-                className={cn(
-                  "rounded-md px-2.5 text-[11.5px] font-semibold capitalize transition-colors",
-                  zoom === item ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
-                )}
-              >
-                {item}
-              </button>
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-zinc-500">
+            {mode === "edit" ? "드래그해서 일정을 조정할 수 있습니다." : "빨간 기준선은 오늘 날짜입니다."}
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-3 rounded-lg border border-zinc-100 bg-zinc-50/60 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">보기 단위</span>
+              <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-white p-0.5">
+                {(["week", "month"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => onZoomChange(item)}
+                    className={cn(
+                      "rounded-md px-2.5 text-[11.5px] font-semibold capitalize transition-colors",
+                      zoom === item ? "bg-zinc-950 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-900"
+                    )}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="h-5 w-px bg-zinc-200" />
+            <div className="flex h-8 items-center gap-2 text-[11.5px] font-medium text-zinc-700">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">표시 옵션</span>
+              <span>완료 숨김</span>
+              <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
+            </div>
           </div>
-          <div className="flex h-7 items-center gap-2 text-[11.5px] font-medium text-zinc-700">
-            <span>완료 숨김</span>
-            <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
-          </div>
-          {mode === "view" ? (
-            <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onEnterEditMode}>
-              <Pencil className="mr-1.5 h-3.5 w-3.5" />
-              간트 일정 수정
-            </Button>
-          ) : (
-            <>
-              <span className="inline-flex h-8 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-800">
-                {unsavedCount} unsaved
-              </span>
-              <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onSave} disabled={saving || unsavedCount === 0}>
-                <Save className="mr-1.5 h-3.5 w-3.5" />
-                {saving ? "Saving..." : "Save changes"}
-              </Button>
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onReset} disabled={saving || unsavedCount === 0}>
-                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                Reset
-              </Button>
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onCancel} disabled={saving}>
-                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                Cancel
-              </Button>
-            </>
-          )}
         </div>
       </div>
       {visibleRows.length === 0 ? (
