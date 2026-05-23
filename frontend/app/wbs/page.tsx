@@ -1,7 +1,7 @@
 "use client";
 
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -66,7 +66,7 @@ type WbsRow = {
 
 type WbsBadge = "recent" | "new" | "schedule" | "owner" | "status" | "confirm";
 type ViewMode = "view" | "edit";
-type GanttZoom = "week" | "month";
+type GanttZoom = "fit" | "month" | "week";
 type DragAction = "move" | "resize-left" | "resize-right";
 
 const badgeConfig: Record<WbsBadge, { label: string; className: string }> = {
@@ -302,7 +302,7 @@ export default function CurrentWbsPage() {
   const [changeTypeFilter, setChangeTypeFilter] = useState<(typeof changeTypeOptions)[number]["value"]>("all");
   const [showCompletedInGantt, setShowCompletedInGantt] = useState(true);
   const [ganttHeight, setGanttHeight] = useState(320);
-  const [ganttZoom, setGanttZoom] = useState<GanttZoom>("month");
+  const [ganttZoom, setGanttZoom] = useState<GanttZoom>("fit");
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
   const [groups, setGroups] = useState<ReturnType<typeof loadWbsGroups>>([]);
 
@@ -808,23 +808,29 @@ function GanttChart({
   onCancel: () => void;
   onToggleGroup: (groupKey: string) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(960);
   const displayRowsAfterStatus = useMemo(
     () => displayRows.filter((row) => row.type === "group" || showCompleted || statusBucket(row.task.status) !== "completed"),
     [displayRows, showCompleted]
   );
   const visibleRows = useMemo(() => displayRowsAfterStatus.filter((row): row is Extract<WbsDisplayRow<WbsRow>, { type: "task" }> => row.type === "task").map((row) => row.task), [displayRowsAfterStatus]);
   const validMilestones = milestones.filter((milestone) => toTime(milestone.date) != null);
+  const taskRange = ganttRange(visibleRows);
   const range = ganttTimelineRange(visibleRows, validMilestones);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayTime = today.getTime();
-  const min = (range ? Math.min(range.min, todayTime) : todayTime) - DAY_MS * 3;
-  const max = (range ? Math.max(range.max, todayTime) : todayTime) + DAY_MS * 7;
+  const fitBaseMin = taskRange?.min ?? range?.min ?? todayTime;
+  const fitBaseMax = taskRange?.max ?? range?.max ?? todayTime;
+  const min = zoom === "fit" ? fitBaseMin - DAY_MS * 7 : (range ? Math.min(range.min, todayTime) : todayTime) - DAY_MS * 3;
+  const max = zoom === "fit" ? fitBaseMax + DAY_MS * 7 : (range ? Math.max(range.max, todayTime) : todayTime) + DAY_MS * 7;
   const totalDays = Math.max(1, Math.ceil((max - min) / DAY_MS));
-  const pxPerDay = zoom === "week" ? 36 : 14;
-  const timelineWidth = Math.max(720, totalDays * pxPerDay);
+  const timelineViewportWidth = Math.max(360, viewportWidth - 232);
+  const pxPerDay = zoom === "week" ? 36 : zoom === "month" ? 14 : Math.max(2, timelineViewportWidth / totalDays);
+  const timelineWidth = zoom === "fit" ? timelineViewportWidth : Math.max(720, totalDays * pxPerDay);
   const todayLeft = Math.max(0, Math.min(timelineWidth, ((todayTime - min) / DAY_MS) * pxPerDay));
-  const tickEveryDays = zoom === "week" ? 7 : 30;
+  const tickEveryDays = zoom === "week" ? 7 : zoom === "fit" && totalDays > 180 ? 60 : 30;
   const ticks = Array.from({ length: Math.floor(totalDays / tickEveryDays) + 1 }, (_, index) => min + index * tickEveryDays * DAY_MS);
   const milestoneMarkers = useMemo(() => {
     const markers = [
@@ -847,6 +853,20 @@ function GanttChart({
     });
   }, [min, pxPerDay, timelineWidth, todayLeft, todayTime, validMilestones]);
   const [dragTooltip, setDragTooltip] = useState<{ wbsId: string; text: string; left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const updateWidth = () => setViewportWidth(node.clientWidth);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+  }, [zoom]);
   const rowLayouts = useMemo(() => {
     const layouts = new Map<string, DependencyLayoutItem>();
     let cursorY = 0;
@@ -1004,17 +1024,22 @@ function GanttChart({
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-2">
               <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-white p-0.5">
-                {(["week", "month"] as const).map((item) => (
+                {[
+                  { value: "fit" as const, label: "전체", title: "전체 일정이 한 화면에 보이도록 맞춤" },
+                  { value: "month" as const, label: "월", title: "월 단위로 보기" },
+                  { value: "week" as const, label: "주", title: "주 단위로 자세히 보기" }
+                ].map((item) => (
                   <button
-                    key={item}
+                    key={item.value}
                     type="button"
-                    onClick={() => onZoomChange(item)}
+                    onClick={() => onZoomChange(item.value)}
+                    title={item.title}
                     className={cn(
-                      "rounded-md px-2.5 text-[11.5px] font-semibold capitalize transition-colors",
-                      zoom === item ? "bg-zinc-950 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-900"
+                      "rounded-md px-2.5 text-[11.5px] font-semibold transition-colors",
+                      zoom === item.value ? "bg-zinc-950 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-900"
                     )}
                   >
-                    {item}
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -1031,7 +1056,7 @@ function GanttChart({
         <div className="px-6 py-10 text-center text-sm text-zinc-500">표시할 일정이 없습니다. 완료 숨김을 끄면 완료된 일정도 다시 표시됩니다.</div>
       ) : (
         <>
-        <div className="overflow-auto px-4 py-3" style={{ height }}>
+        <div ref={scrollRef} className={cn("px-4 py-3", zoom === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto")} style={{ height }}>
           <div className="mb-3 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
             <span className="pt-1">Task</span>
             <div className="relative h-14">
