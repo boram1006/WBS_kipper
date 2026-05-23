@@ -264,6 +264,16 @@ function ganttRange(rows: WbsRow[]) {
   return { min: Math.min(...times), max: Math.max(...times) };
 }
 
+function ganttTaskScheduleRange(rows: WbsRow[]) {
+  const starts = rows.map((row) => toTime(row.startDate)).filter((time): time is number => time != null);
+  const dues = rows.map((row) => toTime(row.dueDate)).filter((time): time is number => time != null);
+  if (!starts.length && !dues.length) return null;
+  return {
+    min: starts.length ? Math.min(...starts) : Math.min(...dues),
+    max: dues.length ? Math.max(...dues) : Math.max(...starts)
+  };
+}
+
 function ganttTimelineRange(rows: WbsRow[], milestones: WbsMilestone[]) {
   const times = [
     ...rows.flatMap((row) => [toTime(row.startDate), toTime(row.dueDate)]),
@@ -834,21 +844,21 @@ function GanttChart({
   );
   const visibleRows = useMemo(() => displayRowsAfterStatus.filter((row): row is Extract<WbsDisplayRow<WbsRow>, { type: "task" }> => row.type === "task").map((row) => row.task), [displayRowsAfterStatus]);
   const validMilestones = milestones.filter((milestone) => toTime(milestone.date) != null);
-  const taskRange = ganttRange(visibleRows);
+  const taskRange = ganttTaskScheduleRange(visibleRows);
   const range = ganttTimelineRange(visibleRows, validMilestones);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayTime = today.getTime();
   const fitBaseMin = taskRange?.min ?? range?.min ?? todayTime;
   const fitBaseMax = taskRange?.max ?? range?.max ?? todayTime;
-  const min = zoom === "fit" ? fitBaseMin - DAY_MS * 7 : (range ? Math.min(range.min, todayTime) : todayTime) - DAY_MS * 3;
+  const min = zoom === "fit" ? fitBaseMin - DAY_MS * 3 : (range ? Math.min(range.min, todayTime) : todayTime) - DAY_MS * 3;
   const max = zoom === "fit" ? fitBaseMax + DAY_MS * 7 : (range ? Math.max(range.max, todayTime) : todayTime) + DAY_MS * 7;
   const totalDays = Math.max(1, Math.ceil((max - min) / DAY_MS));
   const timelineViewportWidth = Math.max(360, viewportWidth - 232);
   const pxPerDay = zoom === "week" ? 36 : zoom === "month" ? 14 : Math.max(2, timelineViewportWidth / totalDays);
   const timelineWidth = zoom === "fit" ? timelineViewportWidth : Math.max(720, totalDays * pxPerDay);
   const todayLeft = Math.max(0, Math.min(timelineWidth, ((todayTime - min) / DAY_MS) * pxPerDay));
-  const tickEveryDays = zoom === "week" ? 7 : zoom === "fit" && totalDays > 180 ? 60 : 30;
+  const tickEveryDays = zoom === "week" ? 7 : zoom === "fit" ? (totalDays > 90 ? 30 : 7) : 30;
   const ticks = Array.from({ length: Math.floor(totalDays / tickEveryDays) + 1 }, (_, index) => min + index * tickEveryDays * DAY_MS);
   const milestoneMarkers = useMemo(() => {
     const markers = [
