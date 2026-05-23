@@ -1123,8 +1123,13 @@ function GanttChart({
                 return (
                   <div
                     key={`group-${displayRow.groupKey}`}
-                    className={cn("grid items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-100/80 text-[12px] shadow-[inset_0_-1px_0_rgba(212,212,216,0.65)]", index > 0 && "mt-2.5")}
-                    style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_GROUP_ROW_HEIGHT }}
+                    className="grid items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-100/80 text-[12px] shadow-[inset_0_-1px_0_rgba(212,212,216,0.65)]"
+                    style={{
+                      gridTemplateColumns: `220px ${timelineWidth}px`,
+                      minHeight: GANTT_GROUP_ROW_HEIGHT,
+                      marginTop: index === 0 ? 0 : GANTT_GROUP_TOP_GAP,
+                      marginBottom: GANTT_GROUP_BOTTOM_GAP
+                    }}
                   >
                     <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="flex min-w-0 items-center gap-2 px-2 text-left">
                       {collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
