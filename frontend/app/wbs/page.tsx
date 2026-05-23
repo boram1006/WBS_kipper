@@ -291,7 +291,7 @@ function formatShortDate(time: number) {
 
 function timelineLabelClass(left: number, width: number) {
   if (left < 66) return "translate-x-0 text-left";
-  if (width - left < 66) return "-translate-x-full text-right";
+  if (width - left < 132) return "-translate-x-full text-right";
   return "-translate-x-1/2 text-center";
 }
 
@@ -1130,7 +1130,7 @@ function GanttChart({
                   <div
                     key={marker.id}
                     className={cn(
-                      "absolute flex max-w-[132px] items-center gap-1.5 rounded-full bg-white/95 text-[10px] font-semibold tracking-normal",
+                      "absolute flex max-w-[132px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white/95 text-[10px] font-semibold tracking-normal",
                       marker.variant === "today" ? "px-1" : "border px-2 py-0.5",
                       getMilestoneMarkerClass(marker).label,
                       timelineLabelClass(marker.left, timelineWidth)
