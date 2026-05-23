@@ -954,8 +954,10 @@ function GanttChart({
 
   function startGanttDrag(event: ReactPointerEvent<HTMLElement>, row: WbsRow, action: DragAction) {
     if (mode !== "edit" || !isValidDateValue(row.startDate) || !isValidDateValue(row.dueDate)) return;
+    if (action === "move" && (event.target as HTMLElement).closest("[data-gantt-resize-handle]")) return;
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     const startX = event.clientX;
     const barTop = event.currentTarget.getBoundingClientRect().top;
     const originalStartDate = row.startDate;
@@ -978,7 +980,13 @@ function GanttChart({
             ? `Start: ${originalStartDate} → ${nextStartDate}`
             : `Due: ${originalDueDate} → ${nextDueDate}`;
       }
-      onRowDatesChange(row.wbsId, { startDate: nextStartDate, dueDate: nextDueDate });
+      if (action === "move") {
+        onRowDatesChange(row.wbsId, { startDate: nextStartDate, dueDate: nextDueDate });
+      } else if (action === "resize-left") {
+        onRowDatesChange(row.wbsId, { startDate: nextStartDate });
+      } else {
+        onRowDatesChange(row.wbsId, { dueDate: nextDueDate });
+      }
       setDragTooltip({ wbsId: row.wbsId, text: tooltipText, left: clientX - startX, top: Math.max(-36, clientY - barTop - 42) });
     };
     applyDelta(0, event.clientX, event.clientY);
@@ -1216,12 +1224,14 @@ function GanttChart({
                         {mode === "edit" && (
                           <>
                             <span
-                              className="absolute left-0 top-1/2 h-5 w-2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-white/80 bg-white/70 shadow-sm"
+                              data-gantt-resize-handle="left"
+                              className="absolute left-0 top-1/2 z-20 h-5 w-2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-white/80 bg-white/70 shadow-sm"
                               onPointerDown={(event) => startGanttDrag(event, row, "resize-left")}
                               title="Resize start date"
                             />
                             <span
-                              className="absolute right-0 top-1/2 h-5 w-2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-white/80 bg-white/70 shadow-sm"
+                              data-gantt-resize-handle="right"
+                              className="absolute right-0 top-1/2 z-20 h-5 w-2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-white/80 bg-white/70 shadow-sm"
                               onPointerDown={(event) => startGanttDrag(event, row, "resize-right")}
                               title="Resize due date"
                             />
