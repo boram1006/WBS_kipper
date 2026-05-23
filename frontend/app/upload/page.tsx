@@ -865,38 +865,47 @@ function MilestoneSettings({
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <CalendarDays className="h-3.5 w-3.5 text-zinc-500" />
-            마일스톤
+            ????
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">간트 차트에 Today 선처럼 표시할 주요 날짜를 입력합니다.</p>
+          <p className="mt-1 text-xs text-zinc-500">Gantt ??? Today ??? ??? ?? ??? ?????.</p>
         </div>
         <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAdd}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
-          마일스톤 추가
+          ???? ??
         </Button>
       </div>
       {milestones.length === 0 ? (
-        <div className="px-4 py-5 text-[12.5px] text-zinc-500">아직 등록된 마일스톤이 없습니다.</div>
+        <div className="flex flex-col items-start gap-3 px-4 py-5 text-[12.5px] text-zinc-500">
+          <div>
+            <p className="font-medium text-zinc-700">??? ????? ????.</p>
+            <p className="mt-1">Gantt? ??? ???? ?????.</p>
+          </div>
+          <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={onAdd}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            ???? ??
+          </Button>
+        </div>
       ) : (
-        <div className="divide-y divide-zinc-100">
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
           {milestones.map((milestone) => (
-            <div key={milestone.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(220px,1fr)_180px_36px]">
+            <div key={milestone.id} className="grid grid-cols-[minmax(0,1fr)_136px_32px] items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/70 p-2">
               <Input
                 value={milestone.label}
                 onChange={(event) => onUpdate(milestone.id, "label", event.target.value)}
-                placeholder="예: MVP 릴리즈"
-                className="h-9 rounded-lg border-zinc-200 text-[12.5px] shadow-none"
+                placeholder="?: MVP ??"
+                className="h-8 min-w-0 rounded-md border-zinc-200 bg-white px-2 text-[12px] shadow-none"
               />
               <Input
                 type="date"
                 value={milestone.date}
                 onChange={(event) => onUpdate(milestone.id, "date", event.target.value)}
-                className="h-9 rounded-lg border-zinc-200 text-[12.5px] shadow-none"
+                className="h-8 rounded-md border-zinc-200 bg-white px-2 text-[12px] shadow-none"
               />
               <button
                 type="button"
                 onClick={() => onDelete(milestone.id)}
-                className="grid h-9 w-9 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
-                aria-label="마일스톤 삭제"
+                className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
+                aria-label="???? ??"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
