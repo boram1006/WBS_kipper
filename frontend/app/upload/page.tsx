@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   Download,
@@ -25,6 +26,7 @@ import { ProjectSelector } from "@/components/project-selector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { flattenVisibleRows, groupWbsTasks, isGroupRow } from "@/components/wbs/wbs-grouping";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { setActiveProjectId, useActiveProjectId } from "@/lib/use-project-id";
@@ -40,6 +42,8 @@ type StandardColumn = {
 
 type WbsEditableRow = {
   clientId: string;
+  wbsId?: string;
+  id?: string;
   wbs_id: string;
   task_name: string;
   description: string;
@@ -828,6 +832,28 @@ function EditableWbsTable({
 }) {
   const issueMap = new Map(validation.rowIssues.map((issue) => [issue.rowIndex, issue]));
   const [draggingClientId, setDraggingClientId] = useState<string | null>(null);
+  const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set());
+  const displayRows = useMemo(() => groupWbsTasks(rows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id }))), [rows]);
+  const visibleDisplayRows = useMemo(() => flattenVisibleRows(displayRows, collapsedGroupKeys), [collapsedGroupKeys, displayRows]);
+  const visibleTaskNumberByClientId = useMemo(() => {
+    let taskIndex = 0;
+    const numberByClientId = new Map<string, number>();
+    for (const displayRow of visibleDisplayRows) {
+      if (isGroupRow(displayRow)) continue;
+      taskIndex += 1;
+      numberByClientId.set(displayRow.task.clientId, taskIndex);
+    }
+    return numberByClientId;
+  }, [visibleDisplayRows]);
+
+  function toggleGroup(groupKey: string) {
+    setCollapsedGroupKeys((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }
 
   return (
     <section className="mt-5 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -876,12 +902,29 @@ function EditableWbsTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => {
+              {visibleDisplayRows.map((displayRow) => {
+                if (isGroupRow(displayRow)) {
+                  const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
+                  return (
+                    <tr key={`group-${displayRow.groupKey}`} className="border-y border-zinc-200 bg-zinc-100/80">
+                      <td colSpan={12} className="px-3 py-2">
+                        <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="flex w-full items-center gap-2 text-left">
+                          {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
+                          <span className="text-[12px] font-semibold text-zinc-800">{displayRow.label}</span>
+                          <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
+                          {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                }
+                const row = displayRow.task;
+                const index = rows.findIndex((item) => item.clientId === row.clientId);
                 const issue = issueMap.get(index + 1);
                 const hasError = Boolean(issue && (issue.missing.length > 0 || issue.invalidDates.length > 0));
                 return (
                   <tr key={row.clientId} className={cn("border-b border-zinc-100 last:border-0", hasError && "bg-amber-50/40")}>
-                    <td className="px-3 py-2 font-mono text-zinc-400">{index + 1}</td>
+                    <td className="px-3 py-2 font-mono text-zinc-400">{visibleTaskNumberByClientId.get(row.clientId) ?? index + 1}</td>
                     <td
                       className={cn("px-2 py-2", draggingClientId && draggingClientId !== row.clientId && "bg-zinc-50")}
                       onDragOver={(event) => event.preventDefault()}
