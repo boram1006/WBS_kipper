@@ -564,8 +564,7 @@ export default function CurrentWbsPage() {
           ) : rows.length === 0 ? (
             <EmptyState onImport={() => router.push(routes.upload(projectId))} />
           ) : (
-            <div className={cn("grid gap-4", activeRow && mode === "view" ? "grid-cols-[minmax(760px,1fr)_360px]" : "grid-cols-1")}>
-              <div className="min-w-0 space-y-4">
+            <div className="min-w-0 space-y-4">
                 {error && (
                   <div className={cn("flex items-start gap-2 rounded-xl border px-4 py-3 text-[12px] leading-5", dataSource === "cache" ? "border-sky-200 bg-sky-50 text-sky-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -611,7 +610,8 @@ export default function CurrentWbsPage() {
                   onToggleGroup={toggleGroup}
                 />
 
-                <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <div className={cn("grid gap-4", activeRow && mode === "view" ? "xl:grid-cols-[minmax(0,1fr)_380px]" : "grid-cols-1")}>
+                  <section className="min-w-0 rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-3">
                     <div className="relative min-w-[240px] flex-1">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
@@ -664,6 +664,7 @@ export default function CurrentWbsPage() {
                             );
                           }
                           const row = displayRow.task;
+                          const scheduleBadge = getScheduleBadge(row, currentDay);
                           return (
                             <tr
                               key={row.wbsId}
@@ -701,15 +702,18 @@ export default function CurrentWbsPage() {
                                   row.startDate
                                 )}
                               </Td>
-                              <Td>
+                              <Td className="min-w-[150px]">
                                 {mode === "edit" ? (
                                   <DateCellInput value={row.dueDate} onChange={(value) => updateRowDates(row.wbsId, { dueDate: value || "-" })} />
                                 ) : (
-                                  <div className="flex flex-col gap-1">
-                                    <span>{row.dueDate}</span>
-                                    {getScheduleBadge(row, currentDay) && (
-                                      <span className={cn("w-fit rounded border px-1.5 py-0.5 text-[10.5px] font-semibold", getScheduleBadge(row, currentDay)!.className)}>
-                                        {getScheduleBadge(row, currentDay)!.label}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="whitespace-nowrap">{row.dueDate}</span>
+                                    {scheduleBadge && (
+                                      <span
+                                        title={scheduleBadge.label}
+                                        className={cn("w-fit whitespace-nowrap rounded border px-1.5 py-0.5 text-[10.5px] font-semibold leading-none", scheduleBadge.className)}
+                                      >
+                                        {scheduleBadge.label.replace(/^지연\s*/, "")}
                                       </span>
                                     )}
                                   </div>
@@ -732,10 +736,14 @@ export default function CurrentWbsPage() {
                     </table>
                     {filteredRows.length === 0 && <div className="px-6 py-12 text-center text-sm text-zinc-500">조건에 맞는 WBS row가 없습니다.</div>}
                   </div>
-                </section>
-              </div>
+                  </section>
 
-              {activeRow && mode === "view" && <TaskDrawer row={activeRow} onClose={() => setActiveId(null)} />}
+                  {activeRow && mode === "view" && (
+                    <div className="min-w-0 xl:sticky xl:top-24 xl:self-start">
+                      <TaskDrawer row={activeRow} onClose={() => setActiveId(null)} className="max-h-[calc(100vh-120px)]" />
+                    </div>
+                  )}
+                </div>
             </div>
           )}
         </main>
@@ -1251,13 +1259,13 @@ function GanttChart({
   );
 }
 
-function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void }) {
+function TaskDrawer({ row, onClose, className }: { row: WbsRow | null; onClose: () => void; className?: string }) {
   if (!row) {
     return <aside className="flex min-h-0 flex-col rounded-xl border border-dashed border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">WBS row를 선택하면 상세 정보가 표시됩니다.</aside>;
   }
 
   return (
-    <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <aside className={cn("flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)", className)}>
       <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3.5">
         <div>
           <h2 className="text-sm font-semibold leading-5 text-zinc-950">Task Detail</h2>
