@@ -31,6 +31,15 @@ import { Input } from "@/components/ui/input";
 import { GanttDependencyLayer } from "@/components/wbs/gantt-dependency-layer";
 import { resolveDependencyLinks, type DependencyLayoutItem } from "@/components/wbs/gantt-dependencies";
 import { flattenVisibleRows, groupWbsTasks, isGroupRow, isTaskRow, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
+import {
+  getGanttBarClass,
+  getScheduleBadge,
+  getScheduleState,
+  getScheduleStateLabel,
+  getWbsStatusBadgeClass,
+  getWbsStatusLabel,
+  normalizeWbsStatus
+} from "@/components/wbs/wbs-status";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { WbsColumnMapping } from "@/lib/types";
@@ -275,10 +284,9 @@ function timelineLabelClass(left: number, width: number) {
 }
 
 function statusBucket(status: string) {
-  const text = status.toLowerCase();
-  if (text.includes("완료") || text.includes("done") || text.includes("complete")) return "completed";
-  if (text.includes("진행") || text.includes("progress")) return "progress";
-  if (text.includes("지연") || text.includes("delay") || text.includes("late")) return "delayed";
+  const normalized = normalizeWbsStatus(status);
+  if (normalized === "completed") return "completed";
+  if (normalized === "progress") return "progress";
   return "other";
 }
 
@@ -305,6 +313,11 @@ export default function CurrentWbsPage() {
   const [ganttZoom, setGanttZoom] = useState<GanttZoom>("fit");
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
   const [groups, setGroups] = useState<ReturnType<typeof loadWbsGroups>>([]);
+  const currentDay = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  }, []);
 
   useEffect(() => {
     setMilestones(projectId ? loadWbsMilestones(projectId) : []);
@@ -392,12 +405,12 @@ export default function CurrentWbsPage() {
       const matchesStatus =
         statusFilter === "all" ||
         row.status === statusFilter ||
-        (statusFilter === "__delayed" && (statusBucket(row.status) === "delayed" || row.badges.includes("schedule")));
+        (statusFilter === "__delayed" && getScheduleState(row, currentDay) === "delayed");
       const matchesOwner = ownerFilter === "all" || row.owner === ownerFilter;
       const matchesChangeType = changeTypeFilter === "all" || row.badges.includes(changeTypeFilter as WbsBadge);
       return matchesQuery && matchesStatus && matchesOwner && matchesChangeType;
     });
-  }, [changeTypeFilter, ownerFilter, query, rows, statusFilter]);
+  }, [changeTypeFilter, currentDay, ownerFilter, query, rows, statusFilter]);
   const groupedRows = useMemo(() => groupWbsTasks(filteredRows, groups), [filteredRows, groups]);
   const visibleGroupedRows = useMemo(() => flattenVisibleRows(groupedRows, collapsedGroupKeys), [collapsedGroupKeys, groupedRows]);
 
@@ -407,9 +420,9 @@ export default function CurrentWbsPage() {
       total: rows.length,
       progress: rows.filter((row) => statusBucket(row.status) === "progress").length,
       completed: rows.filter((row) => statusBucket(row.status) === "completed").length,
-      delayed: rows.filter((row) => statusBucket(row.status) === "delayed" || row.badges.includes("schedule")).length
+      delayed: rows.filter((row) => getScheduleState(row, currentDay) === "delayed").length
     }),
-    [rows]
+    [currentDay, rows]
   );
   const activeSummaryFilter =
     statusFilter === "all" && changeTypeFilter === "all"
@@ -418,7 +431,7 @@ export default function CurrentWbsPage() {
           ? "progress"
           : statusOptions.find((status) => statusFilter === status && statusBucket(status) === "completed")
             ? "completed"
-            : statusFilter === "__delayed" || statusOptions.find((status) => statusFilter === status && statusBucket(status) === "delayed")
+            : statusFilter === "__delayed"
               ? "delayed"
               : null;
 
@@ -430,7 +443,7 @@ export default function CurrentWbsPage() {
     }
     setChangeTypeFilter("all");
     const matchingStatus = statusOptions.find((status) => status !== "all" && statusBucket(status) === filter);
-    setStatusFilter(filter === "delayed" ? matchingStatus ?? "__delayed" : matchingStatus ?? "all");
+    setStatusFilter(filter === "delayed" ? "__delayed" : matchingStatus ?? "all");
   }
 
   function downloadCsv() {
@@ -619,7 +632,6 @@ export default function CurrentWbsPage() {
                           <Th>Due date</Th>
                           <Th>Status</Th>
                           <Th>Dependency</Th>
-                          <Th>Last updated</Th>
                         </tr>
                       </thead>
                       <tbody>
@@ -628,7 +640,7 @@ export default function CurrentWbsPage() {
                             const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
                             return (
                               <tr key={`group-${displayRow.groupKey}`} className="border-y border-zinc-200 bg-zinc-100/80">
-                                <td colSpan={8} className="px-3 py-2">
+                                <td colSpan={7} className="px-3 py-2">
                                   <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="flex w-full items-center gap-2 text-left">
                                     {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
                                     <span className="text-[12px] font-semibold text-zinc-800">{displayRow.label}</span>
@@ -677,24 +689,30 @@ export default function CurrentWbsPage() {
                                   row.startDate
                                 )}
                               </Td>
-                              <Td className={row.badges.includes("schedule") ? "font-semibold text-violet-700" : undefined}>
+                              <Td>
                                 {mode === "edit" ? (
                                   <DateCellInput value={row.dueDate} onChange={(value) => updateRowDates(row.wbsId, { dueDate: value || "-" })} />
                                 ) : (
-                                  row.dueDate
+                                  <div className="flex flex-col gap-1">
+                                    <span>{row.dueDate}</span>
+                                    {getScheduleBadge(row, currentDay) && (
+                                      <span className={cn("w-fit rounded border px-1.5 py-0.5 text-[10.5px] font-semibold", getScheduleBadge(row, currentDay)!.className)}>
+                                        {getScheduleBadge(row, currentDay)!.label}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </Td>
                               <Td>
-                                <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status}</span>
+                                <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", getWbsStatusBadgeClass(row.status))}>{getWbsStatusLabel(row.status)}</span>
                               </Td>
-                              <Td>
+                              <Td className="max-w-[112px]">
                                 <DependencyCell
                                   dependency={row.dependency}
                                   dependencyRow={rowByWbsId.get(row.dependency)}
                                   onSelect={(wbsId) => setActiveId(wbsId)}
                                 />
                               </Td>
-                              <Td>{row.lastUpdated}</Td>
                             </tr>
                           );
                         })}
@@ -1071,7 +1089,7 @@ function GanttChart({
                     key={marker.id}
                     className={cn(
                       "absolute flex max-w-[132px] flex-col items-center gap-0.5 rounded bg-white px-1 text-[10px] font-semibold tracking-normal",
-                      marker.tone === "today" ? "text-[#fd312e]" : "text-violet-700",
+                      marker.tone === "today" ? "text-[#fd312e]" : "text-amber-700",
                       timelineLabelClass(marker.left, timelineWidth)
                     )}
                     style={{ left: marker.left, top: marker.lane * 14 }}
@@ -1145,7 +1163,7 @@ function GanttChart({
                       return (
                         <div
                           key={milestone.id}
-                          className="absolute bottom-0 top-0 z-10 w-px bg-violet-500"
+                          className="absolute bottom-0 top-0 z-10 border-l border-dashed border-amber-400/80"
                           style={{ left: `${milestoneLeft}px` }}
                           title={`${milestone.label} (${milestone.date})`}
                         />
@@ -1163,12 +1181,13 @@ function GanttChart({
                         }}
                         className={cn(
                           "absolute top-1/2 h-4 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
-                          ganttBarClass(row.status),
+                          getGanttBarClass(row, todayTime),
                           highlighted && "h-5 shadow-md ring-2 ring-sky-200",
                           mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                         )}
                         style={{ left: `${geometry.left}px`, width: `${geometry.width}px` }}
                       >
+                        {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1 rounded-l-full bg-red-500" />}
                         {mode === "edit" && (
                           <>
                             <span
@@ -1243,7 +1262,10 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
         <section>
           <h3 className="text-lg font-semibold leading-6 tracking-tight text-zinc-950">{row.taskName}</h3>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status || "-"}</span>
+            <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", getWbsStatusBadgeClass(row.status))}>{getWbsStatusLabel(row.status)}</span>
+            {getScheduleBadge(row) && (
+              <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", getScheduleBadge(row)!.className)}>{getScheduleBadge(row)!.label}</span>
+            )}
             {!hasKnownDates(row) && <DateUnknownBadge />}
             {row.badges.map((badge) => (
               <StatusBadge key={badge} badge={badge} />
@@ -1262,8 +1284,8 @@ function TaskDrawer({ row, onClose }: { row: WbsRow | null; onClose: () => void 
           <DetailItem label="Owner" value={row.owner} icon={UserRound} />
           <DetailItem label="Start date" value={row.startDate} icon={Calendar} />
           <DetailItem label="Due date" value={row.dueDate} icon={Calendar} />
+          <DetailItem label="Schedule state" value={getScheduleStateLabel(row)} icon={Clock3} />
           <DetailItem label="Dependency" value={row.dependency} icon={GitBranch} />
-          <DetailItem label="Last updated" value={row.lastUpdated} icon={Clock3} />
         </section>
 
         <DrawerSection title="Task source">
@@ -1360,7 +1382,7 @@ function DependencyCell({
   if (!dependency || dependency === "-") return <span className="text-zinc-400">-</span>;
   if (!dependencyRow) {
     return (
-      <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[11px] font-semibold text-amber-800">
+      <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-amber-800">
         {dependency}
       </span>
     );
@@ -1372,11 +1394,10 @@ function DependencyCell({
         event.stopPropagation();
         onSelect(dependencyRow.wbsId);
       }}
-      className="group inline-flex max-w-[220px] items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-left text-[11px] text-sky-800 hover:border-sky-300 hover:bg-sky-100"
+      className="group inline-flex max-w-[72px] items-center rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-left text-[11px] text-slate-700 hover:border-slate-300 hover:bg-slate-100"
       title={`${dependencyRow.wbsId} · ${dependencyRow.taskName}`}
     >
       <span className="shrink-0 font-mono font-semibold">{dependencyRow.wbsId}</span>
-      <span className="truncate text-sky-700 group-hover:text-sky-900">{dependencyRow.taskName}</span>
     </button>
   );
 }
@@ -1411,26 +1432,6 @@ function Th({ children }: { children: ReactNode }) {
 
 function Td({ children, className }: { children: ReactNode; className?: string }) {
   return <td className={cn("whitespace-nowrap px-3 py-3 align-top text-zinc-700", className)}>{children}</td>;
-}
-
-function statusClass(status: string) {
-  const bucket = statusBucket(status);
-  if (bucket === "completed") return "border-zinc-300 bg-zinc-100 text-zinc-600";
-  if (bucket === "progress") return "border-sky-200 bg-sky-50 text-sky-800";
-  if (bucket === "delayed") return "border-rose-200 bg-rose-50 text-rose-800";
-  if (status.includes("보류") || status.includes("제외") || status.toLowerCase().includes("hold")) return "border-orange-200 bg-orange-50 text-orange-800";
-  if (status.includes("예정") || status.toLowerCase().includes("planned")) return "border-violet-200 bg-violet-50 text-violet-800";
-  return "border-zinc-200 bg-zinc-50 text-zinc-700";
-}
-
-function ganttBarClass(status: string) {
-  const bucket = statusBucket(status);
-  if (bucket === "completed") return "bg-zinc-400";
-  if (bucket === "progress") return "bg-sky-500";
-  if (bucket === "delayed") return "bg-rose-500";
-  if (status.includes("보류") || status.includes("제외") || status.toLowerCase().includes("hold")) return "bg-orange-400";
-  if (status.includes("예정") || status.toLowerCase().includes("planned")) return "bg-violet-500";
-  return "bg-zinc-900";
 }
 
 function LoadingState() {
