@@ -587,6 +587,7 @@ export default function CurrentWbsPage() {
 
                 <GanttChart
                   displayRows={visibleGroupedRows}
+                  timelineRows={rows}
                   collapsedGroupKeys={collapsedGroupKeys}
                   milestones={milestones}
                   height={ganttHeight}
@@ -651,10 +652,10 @@ export default function CurrentWbsPage() {
                           if (isGroupRow(displayRow)) {
                             const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
                             return (
-                              <tr key={`group-${displayRow.groupKey}`} className="border-y border-zinc-200 bg-zinc-100/80">
+                              <tr key={`group-${displayRow.groupKey}`} className="border-y border-[#FD312E]/15 bg-[#FD312E]/[0.04]">
                                 <td colSpan={7} className="px-3 py-2">
                                   <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="flex w-full items-center gap-2 text-left">
-                                    {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
+                                    {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-[#FD312E]/70" /> : <ChevronDown className="h-3.5 w-3.5 text-[#FD312E]/70" />}
                                     <span className="text-[12px] font-semibold text-zinc-800">{displayRow.label}</span>
                                     <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
                                     {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
@@ -674,9 +675,9 @@ export default function CurrentWbsPage() {
                               onMouseEnter={() => setHoveredId(row.wbsId)}
                               onMouseLeave={() => setHoveredId(null)}
                               className={cn(
-                                "border-b border-zinc-100 transition-colors hover:bg-zinc-50",
+                                "border-b border-zinc-100 transition-colors hover:bg-[#FD312E]/[0.035]",
                                 mode === "view" ? "cursor-pointer" : "cursor-default",
-                                (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-zinc-100"
+                                (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-[#FD312E]/[0.045]"
                               )}
                             >
                               <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
@@ -801,6 +802,7 @@ function SummaryCard({
 
 function GanttChart({
   displayRows,
+  timelineRows,
   collapsedGroupKeys,
   milestones,
   height,
@@ -824,6 +826,7 @@ function GanttChart({
   onToggleGroup
 }: {
   displayRows: WbsDisplayRow<WbsRow>[];
+  timelineRows: WbsRow[];
   collapsedGroupKeys: Set<string>;
   milestones: WbsMilestone[];
   height: number;
@@ -854,8 +857,8 @@ function GanttChart({
   );
   const visibleRows = useMemo(() => displayRowsAfterStatus.filter((row): row is Extract<WbsDisplayRow<WbsRow>, { type: "task" }> => row.type === "task").map((row) => row.task), [displayRowsAfterStatus]);
   const validMilestones = milestones.filter((milestone) => toTime(milestone.date) != null);
-  const taskRange = ganttTaskScheduleRange(visibleRows);
-  const range = ganttTimelineRange(visibleRows, validMilestones);
+  const taskRange = ganttTaskScheduleRange(timelineRows);
+  const range = ganttTimelineRange(timelineRows, validMilestones);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayTime = today.getTime();
