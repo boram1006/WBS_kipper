@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Clock3,
   Download,
   Eye,
@@ -28,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GanttDependencyLayer } from "@/components/wbs/gantt-dependency-layer";
 import { resolveDependencyLinks, type DependencyLayoutItem } from "@/components/wbs/gantt-dependencies";
+import { flattenVisibleRows, groupWbsTasks, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { WbsColumnMapping } from "@/lib/types";
@@ -77,6 +80,7 @@ const changeTypeOptions = [
 const STANDARD_COLUMNS = ["wbs_id", "task_name", "description", "owner", "start_date", "due_date", "status", "dependency", "notes"] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const GANTT_ROW_HEIGHT = 40;
+const GANTT_BAR_CENTER_OFFSET = 16;
 
 const STANDARD_MAPPING = {
   id: "wbs_id",
@@ -266,6 +270,7 @@ export default function CurrentWbsPage() {
   const [savedRows, setSavedRows] = useState<WbsRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<ViewMode>("view");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -371,6 +376,8 @@ export default function CurrentWbsPage() {
       return matchesQuery && matchesStatus && matchesOwner && matchesChangeType;
     });
   }, [changeTypeFilter, ownerFilter, query, rows, statusFilter]);
+  const groupedRows = useMemo(() => groupWbsTasks(filteredRows), [filteredRows]);
+  const visibleGroupedRows = useMemo(() => flattenVisibleRows(groupedRows, collapsedGroupKeys), [collapsedGroupKeys, groupedRows]);
 
   const activeRow = activeId ? rows.find((row) => row.wbsId === activeId) ?? null : null;
   const summary = useMemo(
@@ -411,6 +418,15 @@ export default function CurrentWbsPage() {
 
   function updateRowDates(wbsId: string, dates: Partial<Pick<WbsRow, "startDate" | "dueDate">>) {
     setRows((current) => current.map((row) => (row.wbsId === wbsId ? { ...row, ...dates } : row)));
+  }
+
+  function toggleGroup(groupKey: string) {
+    setCollapsedGroupKeys((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
   }
 
   function enterEditMode() {
@@ -522,7 +538,8 @@ export default function CurrentWbsPage() {
                 </section>
 
                 <GanttChart
-                  rows={filteredRows}
+                  displayRows={visibleGroupedRows}
+                  collapsedGroupKeys={collapsedGroupKeys}
                   milestones={milestones}
                   height={ganttHeight}
                   showCompleted={showCompletedInGantt}
@@ -542,6 +559,7 @@ export default function CurrentWbsPage() {
                   onSave={saveWbs}
                   onReset={resetChanges}
                   onCancel={cancelEdit}
+                  onToggleGroup={toggleGroup}
                 />
 
                 <section className="rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -581,63 +599,80 @@ export default function CurrentWbsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredRows.map((row) => (
-                          <tr
-                            key={row.wbsId}
-                            onClick={() => {
-                              if (mode === "view") setActiveId(row.wbsId);
-                            }}
-                            onMouseEnter={() => setHoveredId(row.wbsId)}
-                            onMouseLeave={() => setHoveredId(null)}
-                            className={cn(
-                              "border-b border-zinc-100 transition-colors hover:bg-zinc-50",
-                              mode === "view" ? "cursor-pointer" : "cursor-default",
-                              (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-sky-50/60"
-                            )}
-                          >
-                            <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
-                            <Td>
-                              <div className="font-semibold text-zinc-950">{row.taskName}</div>
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {!hasKnownDates(row) && <DateUnknownBadge />}
-                                {modifiedIds.has(row.wbsId) && (
-                                  <span className="inline-flex rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-sky-800">
-                                    Modified
-                                  </span>
+                        {visibleGroupedRows.map((displayRow) => {
+                          if (displayRow.type === "group") {
+                            const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
+                            return (
+                              <tr key={`group-${displayRow.groupKey}`} className="border-b border-zinc-100 bg-zinc-50/80">
+                                <td colSpan={8} className="px-3 py-2">
+                                  <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="flex w-full items-center gap-2 text-left">
+                                    {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
+                                    <span className="text-[12px] font-semibold text-zinc-800">{displayRow.label}</span>
+                                    <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          const row = displayRow.task;
+                          return (
+                            <tr
+                              key={row.wbsId}
+                              onClick={() => {
+                                if (mode === "view") setActiveId(row.wbsId);
+                              }}
+                              onMouseEnter={() => setHoveredId(row.wbsId)}
+                              onMouseLeave={() => setHoveredId(null)}
+                              className={cn(
+                                "border-b border-zinc-100 transition-colors hover:bg-zinc-50",
+                                mode === "view" ? "cursor-pointer" : "cursor-default",
+                                (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-sky-50/60"
+                              )}
+                            >
+                              <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
+                              <Td>
+                                <div className="font-semibold text-zinc-950">{row.taskName}</div>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {!hasKnownDates(row) && <DateUnknownBadge />}
+                                  {modifiedIds.has(row.wbsId) && (
+                                    <span className="inline-flex rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-sky-800">
+                                      Modified
+                                    </span>
+                                  )}
+                                  {row.badges.map((badge) => (
+                                    <StatusBadge key={badge} badge={badge} />
+                                  ))}
+                                </div>
+                              </Td>
+                              <Td>{row.owner}</Td>
+                              <Td>
+                                {mode === "edit" ? (
+                                  <DateCellInput value={row.startDate} onChange={(value) => updateRowDates(row.wbsId, { startDate: value || "-" })} />
+                                ) : (
+                                  row.startDate
                                 )}
-                                {row.badges.map((badge) => (
-                                  <StatusBadge key={badge} badge={badge} />
-                                ))}
-                              </div>
-                            </Td>
-                            <Td>{row.owner}</Td>
-                            <Td>
-                              {mode === "edit" ? (
-                                <DateCellInput value={row.startDate} onChange={(value) => updateRowDates(row.wbsId, { startDate: value || "-" })} />
-                              ) : (
-                                row.startDate
-                              )}
-                            </Td>
-                            <Td className={row.badges.includes("schedule") ? "font-semibold text-violet-700" : undefined}>
-                              {mode === "edit" ? (
-                                <DateCellInput value={row.dueDate} onChange={(value) => updateRowDates(row.wbsId, { dueDate: value || "-" })} />
-                              ) : (
-                                row.dueDate
-                              )}
-                            </Td>
-                            <Td>
-                              <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status}</span>
-                            </Td>
-                            <Td>
-                              <DependencyCell
-                                dependency={row.dependency}
-                                dependencyRow={rowByWbsId.get(row.dependency)}
-                                onSelect={(wbsId) => setActiveId(wbsId)}
-                              />
-                            </Td>
-                            <Td>{row.lastUpdated}</Td>
-                          </tr>
-                        ))}
+                              </Td>
+                              <Td className={row.badges.includes("schedule") ? "font-semibold text-violet-700" : undefined}>
+                                {mode === "edit" ? (
+                                  <DateCellInput value={row.dueDate} onChange={(value) => updateRowDates(row.wbsId, { dueDate: value || "-" })} />
+                                ) : (
+                                  row.dueDate
+                                )}
+                              </Td>
+                              <Td>
+                                <span className={cn("rounded-md border px-2 py-1 text-[11px] font-semibold", statusClass(row.status))}>{row.status}</span>
+                              </Td>
+                              <Td>
+                                <DependencyCell
+                                  dependency={row.dependency}
+                                  dependencyRow={rowByWbsId.get(row.dependency)}
+                                  onSelect={(wbsId) => setActiveId(wbsId)}
+                                />
+                              </Td>
+                              <Td>{row.lastUpdated}</Td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                     {filteredRows.length === 0 && <div className="px-6 py-12 text-center text-sm text-zinc-500">조건에 맞는 WBS row가 없습니다.</div>}
@@ -702,7 +737,8 @@ function SummaryCard({
 }
 
 function GanttChart({
-  rows,
+  displayRows,
+  collapsedGroupKeys,
   milestones,
   height,
   showCompleted,
@@ -721,9 +757,11 @@ function GanttChart({
   onEnterEditMode,
   onSave,
   onReset,
-  onCancel
+  onCancel,
+  onToggleGroup
 }: {
-  rows: WbsRow[];
+  displayRows: WbsDisplayRow<WbsRow>[];
+  collapsedGroupKeys: Set<string>;
   milestones: WbsMilestone[];
   height: number;
   showCompleted: boolean;
@@ -743,8 +781,13 @@ function GanttChart({
   onSave: () => void;
   onReset: () => void;
   onCancel: () => void;
+  onToggleGroup: (groupKey: string) => void;
 }) {
-  const visibleRows = showCompleted ? rows : rows.filter((row) => statusBucket(row.status) !== "completed");
+  const displayRowsAfterStatus = useMemo(
+    () => displayRows.filter((row) => row.type === "group" || showCompleted || statusBucket(row.task.status) !== "completed"),
+    [displayRows, showCompleted]
+  );
+  const visibleRows = useMemo(() => displayRowsAfterStatus.filter((row): row is Extract<WbsDisplayRow<WbsRow>, { type: "task" }> => row.type === "task").map((row) => row.task), [displayRowsAfterStatus]);
   const validMilestones = milestones.filter((milestone) => toTime(milestone.date) != null);
   const range = ganttTimelineRange(visibleRows, validMilestones);
   const today = new Date();
@@ -761,12 +804,13 @@ function GanttChart({
   const [dragTooltip, setDragTooltip] = useState<{ wbsId: string; text: string; left: number; top: number } | null>(null);
   const rowLayouts = useMemo(() => {
     const layouts = new Map<string, DependencyLayoutItem>();
-    visibleRows.forEach((row, rowIndex) => {
-      const geometry = barGeometry(row);
-      if (geometry) layouts.set(row.wbsId, { ...geometry, rowIndex });
+    displayRowsAfterStatus.forEach((displayRow, rowIndex) => {
+      if (displayRow.type !== "task") return;
+      const geometry = barGeometry(displayRow.task);
+      if (geometry) layouts.set(displayRow.task.wbsId, { ...geometry, rowIndex });
     });
     return layouts;
-  }, [visibleRows, min, pxPerDay]);
+  }, [displayRowsAfterStatus, min, pxPerDay]);
   const dependencyLinks = useMemo(
     () =>
       resolveDependencyLinks(
@@ -948,17 +992,36 @@ function GanttChart({
             </div>
           </div>
           <div className="relative space-y-2">
-            <div className="absolute top-0 z-20" style={{ left: 232, width: timelineWidth, height: visibleRows.length * GANTT_ROW_HEIGHT }}>
+            <div className="pointer-events-none absolute top-0 z-20" style={{ left: 232, width: timelineWidth, height: displayRowsAfterStatus.length * GANTT_ROW_HEIGHT }}>
               <GanttDependencyLayer
                 links={dependencyLinks}
                 layouts={rowLayouts}
                 rowHeight={GANTT_ROW_HEIGHT}
+                barCenterOffset={GANTT_BAR_CENTER_OFFSET}
                 width={timelineWidth}
-                height={visibleRows.length * GANTT_ROW_HEIGHT}
+                height={displayRowsAfterStatus.length * GANTT_ROW_HEIGHT}
                 muted={dragTooltip != null}
               />
             </div>
-            {visibleRows.map((row) => {
+            {displayRowsAfterStatus.map((displayRow) => {
+              if (displayRow.type === "group") {
+                const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
+                return (
+                  <div
+                    key={`group-${displayRow.groupKey}`}
+                    className="grid items-center gap-3 rounded-lg bg-zinc-50/80 text-[12px]"
+                    style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_ROW_HEIGHT }}
+                  >
+                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="flex min-w-0 items-center gap-2 text-left">
+                      {collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
+                      <span className="truncate font-semibold text-zinc-800">{displayRow.label}</span>
+                      <span className="shrink-0 text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
+                    </button>
+                    <div className="h-px bg-zinc-200/80" />
+                  </div>
+                );
+              }
+              const row = displayRow.task;
               const geometry = barGeometry(row);
               const highlighted = hoveredId === row.wbsId || activeId === row.wbsId;
               return (

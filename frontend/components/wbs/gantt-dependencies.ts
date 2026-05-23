@@ -59,12 +59,13 @@ export function resolveDependencyLinks(tasks: DependencyTask[]): DependencyLink[
 export function getDependencyLinePoints(
   sourceLayout: DependencyLayoutItem,
   targetLayout: DependencyLayoutItem,
-  rowHeight: number
+  rowHeight: number,
+  barCenterOffset: number
 ): DependencyLinePoints {
   const startX = sourceLayout.left + sourceLayout.width;
   const endX = targetLayout.left;
-  const startY = sourceLayout.rowIndex * rowHeight + rowHeight / 2;
-  const endY = targetLayout.rowIndex * rowHeight + rowHeight / 2;
-  const midX = startX + Math.max(18, (endX - startX) / 2);
+  const startY = sourceLayout.rowIndex * rowHeight + barCenterOffset;
+  const endY = targetLayout.rowIndex * rowHeight + barCenterOffset;
+  const midX = endX >= startX ? startX + Math.max(18, (endX - startX) / 2) : startX + 18;
   return { startX, startY, midX, endX, endY };
 }
