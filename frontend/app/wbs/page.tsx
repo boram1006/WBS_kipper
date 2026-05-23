@@ -1138,13 +1138,7 @@ function GanttChart({
                     style={{ left: marker.left }}
                     title={marker.title}
                   >
-                    <span
-                      className={cn(
-                        "h-1.5 w-1.5 shrink-0",
-                        marker.variant === "today" ? "rounded-full" : "rotate-45 rounded-[1px]",
-                        getMilestoneMarkerClass(marker).marker
-                      )}
-                    />
+                    {marker.variant === "today" && <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", getMilestoneMarkerClass(marker).marker)} />}
                     {marker.display !== "hidden" && <span className="truncate">{marker.displayLabel}</span>}
                   </div>
                 ))}
