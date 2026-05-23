@@ -41,8 +41,8 @@ export function getWbsStatusBadgeClass(status = "") {
   if (kind === "completed") return "border-zinc-300 bg-zinc-100 text-zinc-600";
   if (kind === "cancelled") return "border-zinc-200 bg-zinc-50 text-zinc-500";
   if (kind === "hold") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (kind === "progress") return "border-slate-300 bg-slate-50 text-slate-700";
-  if (kind === "planned") return "border-zinc-200 bg-zinc-50 text-zinc-700";
+  if (kind === "progress") return "border-zinc-300 bg-zinc-50 text-zinc-700";
+  if (kind === "planned") return "border-zinc-200 bg-white text-zinc-600";
   return "border-zinc-200 bg-white text-zinc-600";
 }
 
@@ -67,11 +67,11 @@ export function getScheduleState(task: WbsStatusTask, today: string | number | D
 export function getGanttBarClass(task: WbsStatusTask, today: string | number | Date = new Date()) {
   const status = normalizeWbsStatus(task.status);
   const scheduleState = getScheduleState(task, today);
-  if (status === "completed") return "bg-zinc-300 opacity-60";
-  if (status === "cancelled") return "bg-zinc-300 opacity-45";
-  if (status === "hold") return "bg-amber-300/80";
-  if (scheduleState === "delayed") return "bg-slate-500";
-  return "bg-slate-400";
+  const delayedAccent = scheduleState === "delayed" ? "ring-1 ring-[#FD312E]/30" : "";
+  if (status === "completed") return `bg-zinc-200 opacity-60 ${delayedAccent}`;
+  if (status === "cancelled") return `bg-zinc-200 opacity-45 ${delayedAccent}`;
+  if (status === "hold") return `border-amber-300/70 bg-amber-200/70 ${delayedAccent}`;
+  return `bg-zinc-300/85 ${delayedAccent}`;
 }
 
 export function getScheduleBadge(task: WbsStatusTask, today: string | number | Date = new Date()) {
@@ -80,10 +80,10 @@ export function getScheduleBadge(task: WbsStatusTask, today: string | number | D
     return { label: "날짜 미정", className: "border-zinc-200 bg-zinc-50 text-zinc-600" };
   }
   if (state === "due-today") {
-    return { label: "오늘 마감", className: "border-red-200 bg-red-50 text-red-700" };
+    return { label: "오늘 마감", className: "border-[#FD312E]/25 bg-[#FD312E]/5 text-[#FD312E]" };
   }
   if (state === "delayed") {
-    return { label: `지연 D+${getDelayDays(task.dueDate, today)}`, className: "border-red-200 bg-red-50 text-red-700" };
+    return { label: `지연 D+${getDelayDays(task.dueDate, today)}`, className: "border-[#FD312E]/30 bg-[#FD312E]/5 text-[#FD312E]" };
   }
   return null;
 }

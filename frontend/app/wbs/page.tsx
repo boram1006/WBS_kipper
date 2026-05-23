@@ -85,7 +85,7 @@ const badgeConfig: Record<WbsBadge, { label: string; className: string }> = {
   schedule: { label: "Schedule changed", className: "border-[#FD312E]/25 bg-[#FD312E]/5 text-[#FD312E]" },
   owner: { label: "Owner changed", className: "border-amber-200 bg-amber-50 text-amber-800" },
   status: { label: "Status changed", className: "border-orange-200 bg-orange-50 text-orange-800" },
-  confirm: { label: "Needs confirmation", className: "border-rose-200 bg-rose-50 text-rose-800" }
+  confirm: { label: "Needs confirmation", className: "border-[#FD312E]/25 bg-[#FD312E]/5 text-[#FD312E]" }
 };
 
 const changeTypeOptions = [
@@ -566,7 +566,7 @@ export default function CurrentWbsPage() {
           ) : (
             <div className="min-w-0 space-y-4">
                 {error && (
-                  <div className={cn("flex items-start gap-2 rounded-xl border px-4 py-3 text-[12px] leading-5", dataSource === "cache" ? "border-sky-200 bg-sky-50 text-sky-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
+                  <div className={cn("flex items-start gap-2 rounded-xl border px-4 py-3 text-[12px] leading-5", dataSource === "cache" ? "border-zinc-200 bg-zinc-50 text-zinc-700" : "border-amber-200 bg-amber-50 text-amber-800")}>
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>{error}</span>
                   </div>
@@ -676,7 +676,7 @@ export default function CurrentWbsPage() {
                               className={cn(
                                 "border-b border-zinc-100 transition-colors hover:bg-zinc-50",
                                 mode === "view" ? "cursor-pointer" : "cursor-default",
-                                (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-sky-50/60"
+                                (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-zinc-100"
                               )}
                             >
                               <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
@@ -685,7 +685,7 @@ export default function CurrentWbsPage() {
                                 <div className="mt-1 flex flex-wrap gap-1">
                                   {!hasKnownDates(row) && <DateUnknownBadge />}
                                   {modifiedIds.has(row.wbsId) && (
-                                    <span className="inline-flex rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-sky-800">
+                                    <span className="inline-flex rounded border border-[#FD312E]/25 bg-[#FD312E]/5 px-1.5 py-0.5 text-[10.5px] font-semibold text-[#FD312E]">
                                       Modified
                                     </span>
                                   )}
@@ -769,15 +769,15 @@ function SummaryCard({
 }) {
   const toneClass = {
     neutral: "border-zinc-200 bg-zinc-50 text-zinc-600",
-    progress: "border-sky-200 bg-sky-50 text-sky-700",
+    progress: "border-zinc-200 bg-white text-zinc-700",
     completed: "border-zinc-300 bg-zinc-100 text-zinc-600",
-    delayed: "border-rose-200 bg-rose-50 text-rose-700"
+    delayed: "border-[#FD312E]/25 bg-[#FD312E]/5 text-[#FD312E]"
   }[tone];
   const activeClass = {
     neutral: "border-zinc-500 ring-zinc-200",
-    progress: "border-sky-500 ring-sky-100",
+    progress: "border-zinc-500 ring-zinc-200",
     completed: "border-zinc-500 ring-zinc-200",
-    delayed: "border-rose-500 ring-rose-100"
+    delayed: "border-[#FD312E] ring-[#FD312E]/15"
   }[tone];
   return (
     <button
@@ -1029,7 +1029,7 @@ function GanttChart({
               </Button>
             ) : (
               <>
-                <span className="inline-flex h-8 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-800">
+                <span className="inline-flex h-8 items-center rounded-lg border border-[#FD312E]/25 bg-[#FD312E]/5 px-3 text-xs font-semibold text-[#FD312E]">
                   {unsavedCount} unsaved
                 </span>
                 <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onReset} disabled={saving || unsavedCount === 0}>
@@ -1164,7 +1164,7 @@ function GanttChart({
               return (
                 <div
                   key={row.wbsId}
-                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-sky-50/70")}
+                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-zinc-100")}
                   style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_ROW_HEIGHT }}
                   onMouseEnter={() => onHover(row.wbsId)}
                   onMouseLeave={() => onHover(null)}
@@ -1178,7 +1178,7 @@ function GanttChart({
                       </span>
                     </div>
                   </div>
-                  <div className={cn("relative h-8 rounded-lg bg-zinc-50 transition-colors", highlighted && "bg-sky-100/60")}>
+                  <div className={cn("relative h-8 rounded-lg bg-zinc-50 transition-colors", highlighted && "bg-zinc-100")}>
                     <div
                       className={cn("absolute bottom-0 top-0 z-10 w-px", getMilestoneMarkerClass({ label: "TODAY", type: "today" }).line)}
                       style={{ left: `${todayLeft}px` }}
@@ -1207,12 +1207,12 @@ function GanttChart({
                         className={cn(
                           "absolute top-1/2 h-4 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
                           getGanttBarClass(row, todayTime),
-                          highlighted && "h-5 shadow-md ring-2 ring-sky-200",
+                          highlighted && "h-5 shadow-md ring-2 ring-[#FD312E]/25",
                           mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                         )}
                         style={{ left: `${geometry.left}px`, width: `${geometry.width}px` }}
                       >
-                        {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1 rounded-l-full bg-red-500" />}
+                        {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1 rounded-l-full bg-[#FD312E]" />}
                         {mode === "edit" && (
                           <>
                             <span
@@ -1388,8 +1388,8 @@ function DateCellInput({ value, onChange }: { value: string; onChange: (value: s
       onClick={(event) => event.stopPropagation()}
       onChange={(event) => onChange(event.target.value)}
       className={cn(
-        "h-8 w-[140px] rounded-lg border bg-white px-2 text-[12px] font-medium text-zinc-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100",
-        inputValue && !isValidDateValue(inputValue) ? "border-rose-300" : "border-zinc-200"
+        "h-8 w-[140px] rounded-lg border bg-white px-2 text-[12px] font-medium text-zinc-700 outline-none focus:border-[#FD312E]/60 focus:ring-2 focus:ring-[#FD312E]/15",
+        inputValue && !isValidDateValue(inputValue) ? "border-[#FD312E]/40" : "border-zinc-200"
       )}
     />
   );
