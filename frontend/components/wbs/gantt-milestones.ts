@@ -16,6 +16,8 @@ export type GanttMilestoneDisplay = GanttMilestoneInput & {
   variant: MilestoneVariant;
 };
 
+export const TODAY_LABEL_COLLISION_THRESHOLD = 88;
+
 export function getMilestonePosition(dateTime: number, timelineStart: number, pxPerDay: number, timelineWidth: number) {
   const dayMs = 24 * 60 * 60 * 1000;
   return Math.max(0, Math.min(timelineWidth, ((dateTime - timelineStart) / dayMs) * pxPerDay));
@@ -30,7 +32,7 @@ export function getMilestoneVariant(milestone: Pick<GanttMilestoneInput, "label"
 
 export function getMilestonePriority(milestone: Pick<GanttMilestoneInput, "label" | "type">) {
   const label = milestone.label.toLowerCase();
-  if (getMilestoneVariant(milestone) === "today") return 0;
+  if (getMilestoneVariant(milestone) === "today") return 99;
   if (label.includes("최종") || label.includes("final")) return 1;
   if (label.includes("mvp")) return 2;
   if (label.includes("poc")) return 3;
@@ -73,6 +75,10 @@ export function getMilestoneMarkerClass(milestone: Pick<GanttMilestoneInput, "la
 }
 
 export function resolveMilestoneLabelVisibility(milestones: GanttMilestoneInput[], minGap = 72): GanttMilestoneDisplay[] {
+  const today = milestones.find((milestone) => getMilestoneVariant(milestone) === "today");
+  const shouldHideTodayLabel = today
+    ? milestones.some((milestone) => getMilestoneVariant(milestone) !== "today" && Math.abs(milestone.left - today.left) <= TODAY_LABEL_COLLISION_THRESHOLD)
+    : false;
   const byPriority = [...milestones]
     .map((milestone, index) => ({ ...milestone, index, priority: getMilestonePriority(milestone) }))
     .sort((a, b) => a.priority - b.priority || a.left - b.left);
@@ -80,6 +86,10 @@ export function resolveMilestoneLabelVisibility(milestones: GanttMilestoneInput[
   const displayById = new Map<string, "full" | "short" | "hidden">();
 
   for (const milestone of byPriority) {
+    if (getMilestoneVariant(milestone) === "today" && shouldHideTodayLabel) {
+      displayById.set(milestone.id, "hidden");
+      continue;
+    }
     const nearest = accepted.find((item) => Math.abs(item.left - milestone.left) < minGap);
     let display: "full" | "short" | "hidden" = "full";
     if (nearest) {
