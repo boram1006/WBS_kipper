@@ -1128,7 +1128,11 @@ function GanttChart({
             <span className="pt-1">Task</span>
             <div className="relative h-9">
               {ticks.map((tick) => (
-                <span key={tick} className="absolute top-0 -translate-x-1/2" style={{ left: `${((tick - min) / DAY_MS) * pxPerDay}px` }}>
+                <span
+                  key={tick}
+                  className={cn("absolute top-0 whitespace-nowrap", timelineLabelClass(((tick - min) / DAY_MS) * pxPerDay, timelineWidth))}
+                  style={{ left: `${((tick - min) / DAY_MS) * pxPerDay}px` }}
+                >
                   {formatShortDate(tick)}
                 </span>
               ))}
