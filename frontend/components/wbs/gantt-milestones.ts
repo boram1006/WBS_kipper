@@ -55,22 +55,22 @@ export function getMilestoneMarkerClass(milestone: Pick<GanttMilestoneInput, "la
   const variant = getMilestoneVariant(milestone);
   if (variant === "today") {
     return {
-      label: "text-[#FD312E]/80",
-      marker: "bg-[#FD312E]/70",
-      line: "bg-[#FD312E]/45"
+      label: "text-red-400",
+      marker: "bg-red-300",
+      line: "bg-red-300/70"
     };
   }
   if (variant === "final") {
     return {
-      label: "border-[#FD312E]/35 bg-[#FD312E]/10 text-[#FD312E] shadow-sm",
-      marker: "bg-[#FD312E]",
-      line: "border-[#FD312E]/80"
+      label: "border-red-200 bg-red-50 text-red-500 shadow-sm",
+      marker: "bg-red-400",
+      line: "border-red-300"
     };
   }
   return {
-    label: "border-[#FD312E]/25 bg-[#FD312E]/5 text-[#FD312E]",
-    marker: "bg-[#FD312E]/90",
-    line: "border-[#FD312E]/65"
+    label: "border-red-200 bg-red-50 text-red-500",
+    marker: "bg-red-300",
+    line: "border-red-300/80"
   };
 }
 

@@ -665,10 +665,10 @@ export default function CurrentWbsPage() {
                           if (isGroupRow(displayRow)) {
                             const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
                             return (
-                              <tr key={`group-${displayRow.groupKey}`} className="border-y border-[#FD312E]/15 bg-[#FD312E]/[0.04]">
+                              <tr key={`group-${displayRow.groupKey}`} className="border-y border-zinc-200 bg-zinc-50">
                                 <td colSpan={7} className="px-3 py-2">
                                   <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="flex w-full items-center gap-2 text-left">
-                                    {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-[#FD312E]/70" /> : <ChevronDown className="h-3.5 w-3.5 text-[#FD312E]/70" />}
+                                    {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
                                     <span className="text-[12px] font-semibold text-zinc-800">{displayRow.label}</span>
                                     <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
                                     {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
@@ -688,9 +688,9 @@ export default function CurrentWbsPage() {
                               onMouseEnter={() => setHoveredId(row.wbsId)}
                               onMouseLeave={() => setHoveredId(null)}
                               className={cn(
-                                "border-b border-zinc-100 transition-colors hover:bg-[#FD312E]/[0.035]",
+                                "border-b border-zinc-100 transition-colors hover:bg-red-50/40",
                                 mode === "view" ? "cursor-pointer" : "cursor-default",
-                                (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-[#FD312E]/[0.045]"
+                                (activeRow?.wbsId === row.wbsId || hoveredId === row.wbsId) && "bg-red-50/50"
                               )}
                             >
                               <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
@@ -1162,7 +1162,7 @@ function GanttChart({
                 return (
                   <div
                     key={`group-${displayRow.groupKey}`}
-                    className="grid items-center gap-3 rounded-lg border border-[#FD312E]/15 bg-[#FD312E]/[0.04] text-[12px] shadow-[inset_0_-1px_0_rgba(253,49,46,0.08)]"
+                    className="grid items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 text-[12px] shadow-[inset_0_-1px_0_rgba(212,212,216,0.55)]"
                     style={{
                       gridTemplateColumns: `220px ${timelineWidth}px`,
                       minHeight: GANTT_GROUP_ROW_HEIGHT,
@@ -1171,13 +1171,13 @@ function GanttChart({
                     }}
                   >
                     <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="flex min-w-0 items-center gap-2 px-2 text-left">
-                      {collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#FD312E]/70" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#FD312E]/70" />}
-                      <span className="truncate font-semibold text-zinc-900">{displayRow.label}</span>
+                      {collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" />}
+                      <span className="truncate font-semibold text-zinc-800">{displayRow.label}</span>
                       <span className="shrink-0 text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
                       {collapsed && <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
                     </button>
-                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="h-full rounded-r-lg bg-[#FD312E]/[0.035] text-left hover:bg-[#FD312E]/[0.06]">
-                      <div className="h-px w-full bg-[#FD312E]/15" />
+                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="h-full rounded-r-lg bg-zinc-50 text-left hover:bg-zinc-100">
+                      <div className="h-px w-full bg-zinc-300/70" />
                     </button>
                   </div>
                 );
@@ -1188,7 +1188,7 @@ function GanttChart({
               return (
                 <div
                   key={row.wbsId}
-                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-[#FD312E]/[0.045]")}
+                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-red-50/50")}
                   style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_ROW_HEIGHT }}
                   onMouseEnter={() => onHover(row.wbsId)}
                   onMouseLeave={() => onHover(null)}
@@ -1202,7 +1202,7 @@ function GanttChart({
                       </span>
                     </div>
                   </div>
-                  <div className={cn("relative h-6 rounded-md bg-zinc-50 transition-colors", highlighted && "bg-[#FD312E]/[0.04]")}>
+                  <div className={cn("relative h-6 rounded-md bg-zinc-50 transition-colors", highlighted && "bg-red-50/40")}>
                     <div
                       className={cn("absolute bottom-0 top-0 z-10 w-px", getMilestoneMarkerClass({ label: "TODAY", type: "today" }).line)}
                       style={{ left: `${todayLeft}px` }}
@@ -1235,10 +1235,10 @@ function GanttChart({
                           className={cn(
                             "pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
                             getGanttBarClass(row, todayTime),
-                            highlighted && "h-3.5 shadow-md ring-2 ring-[#FD312E]/30"
+                            highlighted && "h-3.5 shadow-md ring-2 ring-red-200"
                           )}
                         >
-                          {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-full bg-[#FD312E]" />}
+                          {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-full bg-red-300" />}
                         </span>
                         {mode === "edit" && (
                           <>
