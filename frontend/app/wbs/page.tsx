@@ -679,6 +679,7 @@ export default function CurrentWbsPage() {
                           }
                           const row = displayRow.task;
                           const scheduleBadge = getScheduleBadge(row, currentDay);
+                          const showTaskMeta = !hasKnownDates(row) || modifiedIds.has(row.wbsId) || row.badges.length > 0;
                           return (
                             <tr
                               key={row.wbsId}
@@ -695,17 +696,21 @@ export default function CurrentWbsPage() {
                             >
                               <Td className="font-mono font-semibold text-zinc-700">{row.wbsId}</Td>
                               <Td>
-                                <div className="font-semibold text-zinc-950">{row.taskName}</div>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {!hasKnownDates(row) && <DateUnknownBadge />}
-                                  {modifiedIds.has(row.wbsId) && (
-                                    <span className="inline-flex rounded border border-[#FD312E]/25 bg-[#FD312E]/5 px-1.5 py-0.5 text-[10.5px] font-semibold text-[#FD312E]">
-                                      Modified
-                                    </span>
+                                <div className="flex min-h-[28px] flex-col justify-center">
+                                  <div className="font-semibold leading-tight text-zinc-950">{row.taskName}</div>
+                                  {showTaskMeta && (
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                      {!hasKnownDates(row) && <DateUnknownBadge />}
+                                      {modifiedIds.has(row.wbsId) && (
+                                        <span className="inline-flex rounded border border-[#FD312E]/25 bg-[#FD312E]/5 px-1.5 py-0.5 text-[10.5px] font-semibold text-[#FD312E]">
+                                          Modified
+                                        </span>
+                                      )}
+                                      {row.badges.map((badge) => (
+                                        <StatusBadge key={badge} badge={badge} />
+                                      ))}
+                                    </div>
                                   )}
-                                  {row.badges.map((badge) => (
-                                    <StatusBadge key={badge} badge={badge} />
-                                  ))}
                                 </div>
                               </Td>
                               <Td>{row.owner}</Td>
