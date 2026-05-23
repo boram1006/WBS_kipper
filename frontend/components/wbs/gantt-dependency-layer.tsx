@@ -8,14 +8,12 @@ import { cn } from "@/lib/utils";
 type Props = {
   links: DependencyLink[];
   layouts: Map<string, DependencyLayoutItem>;
-  rowHeight: number;
-  barCenterOffset: number;
   width: number;
   height: number;
   muted?: boolean;
 };
 
-export function GanttDependencyLayer({ links, layouts, rowHeight, barCenterOffset, width, height, muted }: Props) {
+export function GanttDependencyLayer({ links, layouts, width, height, muted }: Props) {
   if (links.length === 0 || width <= 0 || height <= 0) return null;
 
   return (
@@ -29,7 +27,7 @@ export function GanttDependencyLayer({ links, layouts, rowHeight, barCenterOffse
         const sourceLayout = layouts.get(link.sourceId);
         const targetLayout = layouts.get(link.targetId);
         if (!sourceLayout || !targetLayout) return null;
-        const points = getDependencyLinePoints(sourceLayout, targetLayout, rowHeight, barCenterOffset);
+        const points = getDependencyLinePoints(sourceLayout, targetLayout);
         const path = `M ${points.startX} ${points.startY} C ${points.midX} ${points.startY}, ${points.midX} ${points.endY}, ${points.endX} ${points.endY}`;
         return (
           <g key={link.id}>

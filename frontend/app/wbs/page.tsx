@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GanttDependencyLayer } from "@/components/wbs/gantt-dependency-layer";
 import { resolveDependencyLinks, type DependencyLayoutItem } from "@/components/wbs/gantt-dependencies";
-import { flattenVisibleRows, groupWbsTasks, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
+import { flattenVisibleRows, groupWbsTasks, isGroupRow, isTaskRow, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { WbsColumnMapping } from "@/lib/types";
@@ -80,6 +80,8 @@ const changeTypeOptions = [
 const STANDARD_COLUMNS = ["wbs_id", "task_name", "description", "owner", "start_date", "due_date", "status", "dependency", "notes"] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const GANTT_ROW_HEIGHT = 40;
+const GANTT_GROUP_ROW_HEIGHT = 34;
+const GANTT_GROUP_GAP = 10;
 const GANTT_BAR_CENTER_OFFSET = 16;
 
 const STANDARD_MAPPING = {
@@ -600,15 +602,16 @@ export default function CurrentWbsPage() {
                       </thead>
                       <tbody>
                         {visibleGroupedRows.map((displayRow) => {
-                          if (displayRow.type === "group") {
+                          if (isGroupRow(displayRow)) {
                             const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
                             return (
-                              <tr key={`group-${displayRow.groupKey}`} className="border-b border-zinc-100 bg-zinc-50/80">
+                              <tr key={`group-${displayRow.groupKey}`} className="border-y border-zinc-200 bg-zinc-100/80">
                                 <td colSpan={8} className="px-3 py-2">
                                   <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="flex w-full items-center gap-2 text-left">
                                     {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
                                     <span className="text-[12px] font-semibold text-zinc-800">{displayRow.label}</span>
                                     <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
+                                    {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
                                   </button>
                                 </td>
                               </tr>
@@ -804,13 +807,26 @@ function GanttChart({
   const [dragTooltip, setDragTooltip] = useState<{ wbsId: string; text: string; left: number; top: number } | null>(null);
   const rowLayouts = useMemo(() => {
     const layouts = new Map<string, DependencyLayoutItem>();
-    displayRowsAfterStatus.forEach((displayRow, rowIndex) => {
-      if (displayRow.type !== "task") return;
+    let cursorY = 0;
+    displayRowsAfterStatus.forEach((displayRow, index) => {
+      if (isGroupRow(displayRow)) {
+        cursorY += GANTT_GROUP_ROW_HEIGHT + (index === 0 ? 0 : GANTT_GROUP_GAP);
+        return;
+      }
       const geometry = barGeometry(displayRow.task);
-      if (geometry) layouts.set(displayRow.task.wbsId, { ...geometry, rowIndex });
+      if (geometry) layouts.set(displayRow.task.wbsId, { ...geometry, centerY: cursorY + GANTT_BAR_CENTER_OFFSET });
+      cursorY += GANTT_ROW_HEIGHT;
     });
     return layouts;
   }, [displayRowsAfterStatus, min, pxPerDay]);
+  const ganttRowsHeight = useMemo(
+    () =>
+      displayRowsAfterStatus.reduce((height, row, index) => {
+        if (isGroupRow(row)) return height + GANTT_GROUP_ROW_HEIGHT + (index === 0 ? 0 : GANTT_GROUP_GAP);
+        return height + GANTT_ROW_HEIGHT;
+      }, 0),
+    [displayRowsAfterStatus]
+  );
   const dependencyLinks = useMemo(
     () =>
       resolveDependencyLinks(
@@ -992,32 +1008,33 @@ function GanttChart({
             </div>
           </div>
           <div className="relative space-y-2">
-            <div className="pointer-events-none absolute top-0 z-20" style={{ left: 232, width: timelineWidth, height: displayRowsAfterStatus.length * GANTT_ROW_HEIGHT }}>
+            <div className="pointer-events-none absolute top-0 z-20" style={{ left: 232, width: timelineWidth, height: ganttRowsHeight }}>
               <GanttDependencyLayer
                 links={dependencyLinks}
                 layouts={rowLayouts}
-                rowHeight={GANTT_ROW_HEIGHT}
-                barCenterOffset={GANTT_BAR_CENTER_OFFSET}
                 width={timelineWidth}
-                height={displayRowsAfterStatus.length * GANTT_ROW_HEIGHT}
+                height={ganttRowsHeight}
                 muted={dragTooltip != null}
               />
             </div>
-            {displayRowsAfterStatus.map((displayRow) => {
-              if (displayRow.type === "group") {
+            {displayRowsAfterStatus.map((displayRow, index) => {
+              if (isGroupRow(displayRow)) {
                 const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
                 return (
                   <div
                     key={`group-${displayRow.groupKey}`}
-                    className="grid items-center gap-3 rounded-lg bg-zinc-50/80 text-[12px]"
-                    style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_ROW_HEIGHT }}
+                    className={cn("grid items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-100/80 text-[12px] shadow-[inset_0_-1px_0_rgba(212,212,216,0.65)]", index > 0 && "mt-2.5")}
+                    style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_GROUP_ROW_HEIGHT }}
                   >
-                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="flex min-w-0 items-center gap-2 text-left">
+                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="flex min-w-0 items-center gap-2 px-2 text-left">
                       {collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
                       <span className="truncate font-semibold text-zinc-800">{displayRow.label}</span>
                       <span className="shrink-0 text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
+                      {collapsed && <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
                     </button>
-                    <div className="h-px bg-zinc-200/80" />
+                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="h-full rounded-r-lg bg-zinc-100/80 text-left">
+                      <div className="h-px w-full bg-zinc-300/70" />
+                    </button>
                   </div>
                 );
               }
@@ -1028,7 +1045,7 @@ function GanttChart({
                 <div
                   key={row.wbsId}
                   className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-sky-50/70")}
-                  style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}
+                  style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_ROW_HEIGHT }}
                   onMouseEnter={() => onHover(row.wbsId)}
                   onMouseLeave={() => onHover(null)}
                 >
@@ -1041,7 +1058,7 @@ function GanttChart({
                       </span>
                     </div>
                   </div>
-                  <div className="relative h-8 rounded-lg bg-zinc-100">
+                  <div className={cn("relative h-8 rounded-lg bg-zinc-50 transition-colors", highlighted && "bg-sky-100/60")}>
                     <div
                       className="absolute bottom-0 top-0 z-10 w-px bg-[#fd312e]"
                       style={{ left: `${todayLeft}px` }}

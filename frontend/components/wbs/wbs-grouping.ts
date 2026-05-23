@@ -63,3 +63,11 @@ export function groupWbsTasks<TTask extends WbsGroupingTask>(tasks: TTask[]): Wb
 export function flattenVisibleRows<TTask>(displayRows: WbsDisplayRow<TTask>[], collapsedGroupKeys: Set<string>) {
   return displayRows.filter((row) => row.type === "group" || !collapsedGroupKeys.has(row.groupKey));
 }
+
+export function isGroupRow<TTask>(row: WbsDisplayRow<TTask>): row is WbsGroupRow<TTask> {
+  return row.type === "group";
+}
+
+export function isTaskRow<TTask>(row: WbsDisplayRow<TTask>): row is WbsTaskRow<TTask> {
+  return row.type === "task";
+}

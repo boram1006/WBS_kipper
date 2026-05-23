@@ -7,7 +7,7 @@ export type DependencyTask = {
 export type DependencyLayoutItem = {
   left: number;
   width: number;
-  rowIndex: number;
+  centerY: number;
 };
 
 export type DependencyLink = {
@@ -58,14 +58,12 @@ export function resolveDependencyLinks(tasks: DependencyTask[]): DependencyLink[
 
 export function getDependencyLinePoints(
   sourceLayout: DependencyLayoutItem,
-  targetLayout: DependencyLayoutItem,
-  rowHeight: number,
-  barCenterOffset: number
+  targetLayout: DependencyLayoutItem
 ): DependencyLinePoints {
   const startX = sourceLayout.left + sourceLayout.width;
   const endX = targetLayout.left;
-  const startY = sourceLayout.rowIndex * rowHeight + barCenterOffset;
-  const endY = targetLayout.rowIndex * rowHeight + barCenterOffset;
+  const startY = sourceLayout.centerY;
+  const endY = targetLayout.centerY;
   const midX = endX >= startX ? startX + Math.max(18, (endX - startX) / 2) : startX + 18;
   return { startX, startY, midX, endX, endY };
 }
