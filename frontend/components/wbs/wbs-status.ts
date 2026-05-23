@@ -71,7 +71,7 @@ export function getGanttBarClass(task: WbsStatusTask, today: string | number | D
   if (status === "cancelled") return "bg-zinc-200 opacity-50";
   if (scheduleState === "delayed") return "border border-red-300/80 bg-red-200/60 ring-1 ring-red-200/70";
   if (status === "hold") return "border border-amber-300/90 bg-amber-100";
-  if (status === "progress") return "bg-zinc-400/85";
+  if (status === "progress") return "bg-red-200/80";
   if (status === "planned") return "border border-amber-300/60 bg-amber-200/60";
   return "bg-zinc-300/90";
 }
