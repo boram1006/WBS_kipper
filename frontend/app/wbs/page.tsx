@@ -35,7 +35,7 @@ import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { WbsColumnMapping } from "@/lib/types";
 import { useActiveProjectId } from "@/lib/use-project-id";
-import { loadWbsMilestones, loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
+import { loadWbsGroups, loadWbsMilestones, loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type WbsRow = {
@@ -287,9 +287,11 @@ export default function CurrentWbsPage() {
   const [ganttHeight, setGanttHeight] = useState(320);
   const [ganttZoom, setGanttZoom] = useState<GanttZoom>("week");
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
+  const [groups, setGroups] = useState<ReturnType<typeof loadWbsGroups>>([]);
 
   useEffect(() => {
     setMilestones(projectId ? loadWbsMilestones(projectId) : []);
+    setGroups(projectId ? loadWbsGroups(projectId) : []);
   }, [projectId]);
 
   useEffect(() => {
@@ -378,7 +380,7 @@ export default function CurrentWbsPage() {
       return matchesQuery && matchesStatus && matchesOwner && matchesChangeType;
     });
   }, [changeTypeFilter, ownerFilter, query, rows, statusFilter]);
-  const groupedRows = useMemo(() => groupWbsTasks(filteredRows), [filteredRows]);
+  const groupedRows = useMemo(() => groupWbsTasks(filteredRows, groups), [filteredRows, groups]);
   const visibleGroupedRows = useMemo(() => flattenVisibleRows(groupedRows, collapsedGroupKeys), [collapsedGroupKeys, groupedRows]);
 
   const activeRow = activeId ? rows.find((row) => row.wbsId === activeId) ?? null : null;

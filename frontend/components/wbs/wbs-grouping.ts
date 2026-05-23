@@ -1,9 +1,19 @@
 export type WbsGroupingTask = {
   wbsId?: string;
   id?: string;
+  groupKey?: string;
+  group_key?: string;
+  groupName?: string;
+  group_name?: string;
   category?: string;
   phase?: string;
   parent_wbs_id?: string;
+};
+
+export type WbsGroup = {
+  groupKey: string;
+  label: string;
+  order: number;
 };
 
 export type WbsGroupRow<TTask> = {
@@ -32,7 +42,7 @@ function taskId(task: WbsGroupingTask) {
 }
 
 export function getGroupKey(task: WbsGroupingTask) {
-  const explicitGroup = String(task.phase || task.category || task.parent_wbs_id || "").trim();
+  const explicitGroup = String(task.groupKey || task.group_key || task.phase || task.category || task.parent_wbs_id || "").trim();
   if (explicitGroup) return explicitGroup;
 
   const id = taskId(task);
@@ -43,21 +53,30 @@ export function getGroupKey(task: WbsGroupingTask) {
   return parts[0] || "misc";
 }
 
-export function getGroupLabel(groupKey: string) {
-  return GROUP_LABELS[groupKey] || "기타 작업";
+export function getGroupLabel(groupKey: string, groups: WbsGroup[] = []) {
+  return groups.find((group) => group.groupKey === groupKey)?.label || GROUP_LABELS[groupKey] || "기타 작업";
 }
 
-export function groupWbsTasks<TTask extends WbsGroupingTask>(tasks: TTask[]): WbsDisplayRow<TTask>[] {
+export function groupWbsTasks<TTask extends WbsGroupingTask>(tasks: TTask[], groups: WbsGroup[] = []): WbsDisplayRow<TTask>[] {
   const grouped = new Map<string, TTask[]>();
   for (const task of tasks) {
     const groupKey = getGroupKey(task);
     grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), task]);
   }
 
-  return Array.from(grouped.entries()).flatMap(([groupKey, groupTasks]) => [
-    { type: "group" as const, groupKey, label: getGroupLabel(groupKey), taskCount: groupTasks.length },
-    ...groupTasks.map((task) => ({ type: "task" as const, groupKey, task }))
-  ]);
+  const sortedGroups = [...groups].sort((a, b) => a.order - b.order);
+  const orderedGroupKeys = [
+    ...sortedGroups.map((group) => group.groupKey),
+    ...Array.from(grouped.keys()).filter((groupKey) => !groups.some((group) => group.groupKey === groupKey))
+  ];
+
+  return orderedGroupKeys.flatMap((groupKey) => {
+    const groupTasks = grouped.get(groupKey) ?? [];
+    return [
+      { type: "group" as const, groupKey, label: getGroupLabel(groupKey, groups), taskCount: groupTasks.length },
+      ...groupTasks.map((task) => ({ type: "task" as const, groupKey, task }))
+    ];
+  });
 }
 
 export function flattenVisibleRows<TTask>(displayRows: WbsDisplayRow<TTask>[], collapsedGroupKeys: Set<string>) {
@@ -70,4 +89,52 @@ export function isGroupRow<TTask>(row: WbsDisplayRow<TTask>): row is WbsGroupRow
 
 export function isTaskRow<TTask>(row: WbsDisplayRow<TTask>): row is WbsTaskRow<TTask> {
   return row.type === "task";
+}
+
+export function inferGroupsFromTasks<TTask extends WbsGroupingTask>(tasks: TTask[], existingGroups: WbsGroup[] = []): WbsGroup[] {
+  const groupKeys = Array.from(new Set(tasks.map(getGroupKey)));
+  const existingByKey = new Map(existingGroups.map((group) => [group.groupKey, group]));
+  const inferred = groupKeys.map((groupKey, index) => existingByKey.get(groupKey) ?? { groupKey, label: getGroupLabel(groupKey, existingGroups), order: index });
+  const taskGroupSet = new Set(groupKeys);
+  const emptyExistingGroups = existingGroups.filter((group) => !taskGroupSet.has(group.groupKey));
+  return [...inferred, ...emptyExistingGroups].sort((a, b) => a.order - b.order);
+}
+
+export function createNewGroup(existingGroups: WbsGroup[]): WbsGroup {
+  const used = new Set(existingGroups.map((group) => group.groupKey));
+  let index = 1;
+  while (used.has(`G${index}`)) index += 1;
+  return { groupKey: `G${index}`, label: "새 그룹", order: existingGroups.length };
+}
+
+export function renameGroup(groups: WbsGroup[], groupKey: string, label: string) {
+  return groups.map((group) => (group.groupKey === groupKey ? { ...group, label: label.trim() || group.label } : group));
+}
+
+export function deleteGroup(groups: WbsGroup[], groupKey: string) {
+  return groups.filter((group) => group.groupKey !== groupKey);
+}
+
+export function getNextWbsIdForGroup<TTask extends WbsGroupingTask>(tasks: TTask[], groupKey: string) {
+  const prefix = groupKey === "misc" ? "G" : groupKey;
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped}\\.(\\d+)$`);
+  const max = tasks.reduce((currentMax, task) => {
+    const match = pattern.exec(taskId(task));
+    return match ? Math.max(currentMax, Number(match[1])) : currentMax;
+  }, 0);
+  return `${prefix}.${max + 1}`;
+}
+
+export function moveTaskToGroup<TTask extends WbsGroupingTask & { clientId?: string }>(tasks: TTask[], taskIdValue: string, targetGroupKey: string) {
+  const nextId = getNextWbsIdForGroup(tasks, targetGroupKey);
+  return tasks.map((task) => {
+    const id = task.clientId || taskId(task);
+    if (id !== taskIdValue) return task;
+    return { ...task, groupKey: targetGroupKey, wbsId: nextId, id: nextId };
+  });
+}
+
+export function createTaskInGroup<TTask extends WbsGroupingTask>(tasks: TTask[], groupKey: string, createTask: (wbsId: string) => TTask) {
+  return createTask(getNextWbsIdForGroup(tasks, groupKey));
 }

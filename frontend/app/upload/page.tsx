@@ -26,11 +26,22 @@ import { ProjectSelector } from "@/components/project-selector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { flattenVisibleRows, groupWbsTasks, isGroupRow } from "@/components/wbs/wbs-grouping";
+import {
+  createNewGroup,
+  deleteGroup,
+  flattenVisibleRows,
+  getGroupKey,
+  getNextWbsIdForGroup,
+  groupWbsTasks,
+  inferGroupsFromTasks,
+  isGroupRow,
+  renameGroup,
+  type WbsGroup
+} from "@/components/wbs/wbs-grouping";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { setActiveProjectId, useActiveProjectId } from "@/lib/use-project-id";
-import { loadWbsMilestones, loadWbsSnapshot, saveWbsMilestones, saveWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
+import { loadWbsGroups, loadWbsMilestones, loadWbsSnapshot, saveWbsGroups, saveWbsMilestones, saveWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type StandardColumn = {
@@ -253,6 +264,7 @@ export default function WbsSetupPage() {
   const [newWbsName, setNewWbsName] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
+  const [groups, setGroups] = useState<WbsGroup[]>([]);
 
   const validation = useMemo(() => validationFor(rows, uploadedColumns), [rows, uploadedColumns]);
   const badge = statusBadge(validation.status);
@@ -261,12 +273,15 @@ export default function WbsSetupPage() {
 
   useEffect(() => {
     setMilestones(projectId ? loadWbsMilestones(projectId) : []);
+    setGroups(projectId ? loadWbsGroups(projectId) : []);
   }, [projectId]);
 
   useEffect(() => {
     let alive = true;
     function showSavedSnapshot(snapshot: { rows_preview: Record<string, string>[] }) {
-      setRows(editableRowsFromRaw(snapshot.rows_preview));
+      const nextRows = editableRowsFromRaw(snapshot.rows_preview);
+      setRows(nextRows);
+      setGroups(inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), projectId ? loadWbsGroups(projectId) : []));
       setUploadedColumns([...STANDARD_COLUMN_KEYS]);
       setFileName("Saved WBS");
       setIsCreatingNewWbs(false);
@@ -332,7 +347,9 @@ export default function WbsSetupPage() {
   }
 
   function loadSample() {
-    setRows(SAMPLE_ROWS.map(rowFromValues));
+    const nextRows = SAMPLE_ROWS.map(rowFromValues);
+    setRows(nextRows);
+    setGroups(inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groups));
     setUploadedColumns([...STANDARD_COLUMN_KEYS]);
     setFileName("샘플 WBS");
     setError(null);
@@ -342,6 +359,7 @@ export default function WbsSetupPage() {
 
   function clearWbs() {
     setRows([]);
+    setGroups([]);
     setUploadedColumns([]);
     setFileName(null);
     setError(null);
@@ -378,6 +396,7 @@ export default function WbsSetupPage() {
       const result = normalizeUploadedRows(await selectedFile.text());
       setUploadedColumns(result.columns);
       setRows(result.rows);
+      setGroups(inferGroupsFromTasks(result.rows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groups));
       setIsCreatingNewWbs(true);
       const resultValidation = validationFor(result.rows, result.columns);
       if (resultValidation.missingRequiredColumns.length > 0) {
@@ -398,6 +417,42 @@ export default function WbsSetupPage() {
     setRows((current) => [...current, emptyRow(current.length + 1)]);
     setMessage("새 작업 행을 추가했습니다. 저장하기 전에 필수값을 입력해 주세요.");
     setError(null);
+  }
+
+  function addGroup() {
+    setGroups((current) => [...current, createNewGroup(current)]);
+    setMessage("새 그룹을 추가했습니다. 그룹 안에서 작업을 추가하세요.");
+    setError(null);
+  }
+
+  function renameGroupByKey(groupKey: string, label: string) {
+    setGroups((current) => renameGroup(current, groupKey, label));
+  }
+
+  function deleteGroupByKey(groupKey: string) {
+    const taskCount = rows.filter((row) => getGroupKey({ ...row, wbsId: row.wbs_id, id: row.wbs_id }) === groupKey).length;
+    if (taskCount > 0) {
+      setError("작업이 있는 그룹은 삭제할 수 없습니다. 먼저 작업을 다른 그룹으로 이동하거나 삭제하세요.");
+      return;
+    }
+    setGroups((current) => deleteGroup(current, groupKey));
+    setMessage("빈 그룹을 삭제했습니다.");
+  }
+
+  function addTaskToGroup(groupKey: string) {
+    setRows((current) => [...current, { ...emptyRow(current.length + 1), wbs_id: getNextWbsIdForGroup(current.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groupKey) }]);
+    setMessage("선택한 그룹에 새 작업을 추가했습니다.");
+    setError(null);
+  }
+
+  function moveTaskToGroupByClientId(clientId: string, groupKey: string) {
+    setRows((current) =>
+      current.map((row) =>
+        row.clientId === clientId
+          ? { ...row, wbs_id: getNextWbsIdForGroup(current.filter((item) => item.clientId !== clientId).map((item) => ({ ...item, wbsId: item.wbs_id, id: item.wbs_id })), groupKey) }
+          : row
+      )
+    );
   }
 
   function updateRow(clientId: string, field: keyof WbsEditableRow, value: string) {
@@ -491,6 +546,7 @@ export default function WbsSetupPage() {
       }
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
+      saveWbsGroups(targetProjectId, groups);
       saveWbsMilestones(targetProjectId, validMilestones());
       setIsCreatingNewWbs(false);
       setNewWbsName("");
@@ -647,8 +703,14 @@ export default function WbsSetupPage() {
 
           <EditableWbsTable
             rows={rows}
+            groups={groups}
             validation={validation}
             onAdd={addTask}
+            onAddGroup={addGroup}
+            onAddTaskToGroup={addTaskToGroup}
+            onRenameGroup={renameGroupByKey}
+            onDeleteGroup={deleteGroupByKey}
+            onMoveTaskToGroup={moveTaskToGroupByClientId}
             onDelete={deleteRow}
             onMove={moveRow}
             onUpdate={updateRow}
@@ -817,15 +879,27 @@ function MilestoneSettings({
 
 function EditableWbsTable({
   rows,
+  groups,
   validation,
   onAdd,
+  onAddGroup,
+  onAddTaskToGroup,
+  onRenameGroup,
+  onDeleteGroup,
+  onMoveTaskToGroup,
   onDelete,
   onMove,
   onUpdate
 }: {
   rows: WbsEditableRow[];
+  groups: WbsGroup[];
   validation: ReturnType<typeof validationFor>;
   onAdd: () => void;
+  onAddGroup: () => void;
+  onAddTaskToGroup: (groupKey: string) => void;
+  onRenameGroup: (groupKey: string, label: string) => void;
+  onDeleteGroup: (groupKey: string) => void;
+  onMoveTaskToGroup: (clientId: string, groupKey: string) => void;
   onDelete: (clientId: string) => void;
   onMove: (sourceClientId: string, targetClientId: string) => void;
   onUpdate: (clientId: string, field: keyof WbsEditableRow, value: string) => void;
@@ -833,7 +907,8 @@ function EditableWbsTable({
   const issueMap = new Map(validation.rowIssues.map((issue) => [issue.rowIndex, issue]));
   const [draggingClientId, setDraggingClientId] = useState<string | null>(null);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set());
-  const displayRows = useMemo(() => groupWbsTasks(rows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id }))), [rows]);
+  const displayRows = useMemo(() => groupWbsTasks(rows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groups), [groups, rows]);
+  const groupOptions = useMemo(() => displayRows.filter(isGroupRow), [displayRows]);
   const visibleDisplayRows = useMemo(() => flattenVisibleRows(displayRows, collapsedGroupKeys), [collapsedGroupKeys, displayRows]);
   const visibleTaskNumberByClientId = useMemo(() => {
     let taskIndex = 0;
@@ -871,9 +946,13 @@ function EditableWbsTable({
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           작업 추가
         </Button>
+        <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAddGroup}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          그룹 추가
+        </Button>
       </div>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && groups.length === 0 ? (
         <div className="flex min-h-[260px] flex-col items-center justify-center px-6 text-center text-sm text-zinc-500">
           <Table2 className="mb-3 h-8 w-8 text-zinc-300" />
           샘플 행을 불러오거나 표준 템플릿을 업로드하거나 직접 작업을 추가하세요.
@@ -884,12 +963,13 @@ function EditableWbsTable({
         </div>
       ) : (
         <div className="overflow-auto">
-          <table className="min-w-[1360px] w-full border-collapse text-left text-[12px]">
+          <table className="min-w-[1500px] w-full border-collapse text-left text-[12px]">
             <thead className="bg-zinc-50 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
               <tr className="border-b border-zinc-200">
                 <th className="w-10 px-3 py-3">#</th>
                 <th className="w-10 px-2 py-3" />
                 <th className="w-[96px] px-2 py-3">wbs_id*</th>
+                <th className="w-[150px] px-2 py-3">group</th>
                 <th className="w-[180px] px-2 py-3">task_name*</th>
                 <th className="w-[230px] px-2 py-3">description</th>
                 <th className="w-[130px] px-2 py-3">owner</th>
@@ -907,13 +987,36 @@ function EditableWbsTable({
                   const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
                   return (
                     <tr key={`group-${displayRow.groupKey}`} className="border-y border-zinc-200 bg-zinc-100/80">
-                      <td colSpan={12} className="px-3 py-2">
-                        <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="flex w-full items-center gap-2 text-left">
-                          {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
-                          <span className="text-[12px] font-semibold text-zinc-800">{displayRow.label}</span>
-                          <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
-                          {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
-                        </button>
+                      <td colSpan={13} className="px-3 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2 text-left">
+                            <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="grid h-7 w-7 place-items-center rounded-md hover:bg-white" aria-label="?? ??/???">
+                              {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
+                            </button>
+                            <input
+                              value={displayRow.label}
+                              onChange={(event) => onRenameGroup(displayRow.groupKey, event.target.value)}
+                              className="h-7 min-w-[160px] rounded-md border border-transparent bg-transparent px-1 text-[12px] font-semibold text-zinc-800 outline-none hover:border-zinc-200 hover:bg-white focus:border-zinc-300 focus:bg-white"
+                              aria-label="???"
+                            />
+                            <span className="text-[11px] font-medium text-zinc-400">? {displayRow.taskCount} tasks</span>
+                            {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Button type="button" variant="outline" className="h-7 rounded-md border-zinc-200 bg-white px-2 text-[11px]" onClick={() => onAddTaskToGroup(displayRow.groupKey)}>
+                              <Plus className="mr-1 h-3 w-3" />
+                              ?? ??
+                            </Button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteGroup(displayRow.groupKey)}
+                              className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
+                              aria-label="?? ??"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -952,6 +1055,19 @@ function EditableWbsTable({
                     </td>
                     <td className="px-2 py-2">
                       <CellInput value={row.wbs_id} invalid={issue?.missing.includes("wbs_id")} onChange={(value) => onUpdate(row.clientId, "wbs_id", value)} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        value={displayRow.groupKey}
+                        onChange={(event) => onMoveTaskToGroup(row.clientId, event.target.value)}
+                        className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12px] text-zinc-700 outline-none focus:border-zinc-400"
+                      >
+                        {groupOptions.map((group) => (
+                          <option key={group.groupKey} value={group.groupKey}>
+                            {group.label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-2 py-2">
                       <CellInput value={row.task_name} invalid={issue?.missing.includes("task_name")} onChange={(value) => onUpdate(row.clientId, "task_name", value)} />
