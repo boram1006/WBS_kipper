@@ -979,8 +979,15 @@ function GanttChart({
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    const rect = event.currentTarget.getBoundingClientRect();
+    let dragAction = action;
+    if (action === "move") {
+      const edgeThreshold = Math.min(14, Math.max(8, rect.width / 4));
+      if (event.clientX - rect.left <= edgeThreshold) dragAction = "resize-left";
+      else if (rect.right - event.clientX <= edgeThreshold) dragAction = "resize-right";
+    }
     const startX = event.clientX;
-    const barTop = event.currentTarget.getBoundingClientRect().top;
+    const barTop = rect.top;
     const originalStartDate = row.startDate;
     const originalDueDate = row.dueDate;
     let lastDeltaDays = 0;
@@ -988,22 +995,22 @@ function GanttChart({
       let nextStartDate = originalStartDate;
       let nextDueDate = originalDueDate;
       let tooltipText = "";
-      if (action === "move") {
+      if (dragAction === "move") {
         nextStartDate = addDays(originalStartDate, deltaDays);
         nextDueDate = addDays(originalDueDate, deltaDays);
         tooltipText = `${originalStartDate} ~ ${originalDueDate} → ${nextStartDate} ~ ${nextDueDate}`;
       } else {
-        const resized = clampResizeDate(action, originalStartDate, originalDueDate, deltaDays);
+        const resized = clampResizeDate(dragAction, originalStartDate, originalDueDate, deltaDays);
         nextStartDate = resized.startDate;
         nextDueDate = resized.dueDate;
         tooltipText =
-          action === "resize-left"
+          dragAction === "resize-left"
             ? `Start: ${originalStartDate} → ${nextStartDate}`
             : `Due: ${originalDueDate} → ${nextDueDate}`;
       }
-      if (action === "move") {
+      if (dragAction === "move") {
         onRowDatesChange(row.wbsId, { startDate: nextStartDate, dueDate: nextDueDate });
-      } else if (action === "resize-left") {
+      } else if (dragAction === "resize-left") {
         onRowDatesChange(row.wbsId, { startDate: nextStartDate });
       } else {
         onRowDatesChange(row.wbsId, { dueDate: nextDueDate });
