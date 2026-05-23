@@ -445,16 +445,6 @@ export default function WbsSetupPage() {
     setError(null);
   }
 
-  function moveTaskToGroupByClientId(clientId: string, groupKey: string) {
-    setRows((current) =>
-      current.map((row) =>
-        row.clientId === clientId
-          ? { ...row, wbs_id: getNextWbsIdForGroup(current.filter((item) => item.clientId !== clientId).map((item) => ({ ...item, wbsId: item.wbs_id, id: item.wbs_id })), groupKey) }
-          : row
-      )
-    );
-  }
-
   function updateRow(clientId: string, field: keyof WbsEditableRow, value: string) {
     setRows((current) => current.map((row) => (row.clientId === clientId ? { ...row, [field]: value } : row)));
   }
@@ -710,7 +700,6 @@ export default function WbsSetupPage() {
             onAddTaskToGroup={addTaskToGroup}
             onRenameGroup={renameGroupByKey}
             onDeleteGroup={deleteGroupByKey}
-            onMoveTaskToGroup={moveTaskToGroupByClientId}
             onDelete={deleteRow}
             onMove={moveRow}
             onUpdate={updateRow}
@@ -886,7 +875,6 @@ function EditableWbsTable({
   onAddTaskToGroup,
   onRenameGroup,
   onDeleteGroup,
-  onMoveTaskToGroup,
   onDelete,
   onMove,
   onUpdate
@@ -899,7 +887,6 @@ function EditableWbsTable({
   onAddTaskToGroup: (groupKey: string) => void;
   onRenameGroup: (groupKey: string, label: string) => void;
   onDeleteGroup: (groupKey: string) => void;
-  onMoveTaskToGroup: (clientId: string, groupKey: string) => void;
   onDelete: (clientId: string) => void;
   onMove: (sourceClientId: string, targetClientId: string) => void;
   onUpdate: (clientId: string, field: keyof WbsEditableRow, value: string) => void;
@@ -908,7 +895,6 @@ function EditableWbsTable({
   const [draggingClientId, setDraggingClientId] = useState<string | null>(null);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set());
   const displayRows = useMemo(() => groupWbsTasks(rows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groups), [groups, rows]);
-  const groupOptions = useMemo(() => displayRows.filter(isGroupRow), [displayRows]);
   const visibleDisplayRows = useMemo(() => flattenVisibleRows(displayRows, collapsedGroupKeys), [collapsedGroupKeys, displayRows]);
   const visibleTaskNumberByClientId = useMemo(() => {
     let taskIndex = 0;
@@ -942,10 +928,6 @@ function EditableWbsTable({
             엑셀을 다시 열지 않고 표준 WBS 행을 추가, 수정, 삭제할 수 있습니다. 의존 작업에는 기존 WBS ID를 입력하세요.
           </p>
         </div>
-        <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAdd}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          작업 추가
-        </Button>
         <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAddGroup}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           그룹 추가
@@ -963,13 +945,12 @@ function EditableWbsTable({
         </div>
       ) : (
         <div className="overflow-auto">
-          <table className="min-w-[1500px] w-full border-collapse text-left text-[12px]">
+          <table className="min-w-[1360px] w-full border-collapse text-left text-[12px]">
             <thead className="bg-zinc-50 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500">
               <tr className="border-b border-zinc-200">
                 <th className="w-10 px-3 py-3">#</th>
                 <th className="w-10 px-2 py-3" />
                 <th className="w-[96px] px-2 py-3">wbs_id*</th>
-                <th className="w-[150px] px-2 py-3">group</th>
                 <th className="w-[180px] px-2 py-3">task_name*</th>
                 <th className="w-[230px] px-2 py-3">description</th>
                 <th className="w-[130px] px-2 py-3">owner</th>
@@ -987,31 +968,31 @@ function EditableWbsTable({
                   const collapsed = collapsedGroupKeys.has(displayRow.groupKey);
                   return (
                     <tr key={`group-${displayRow.groupKey}`} className="border-y border-zinc-200 bg-zinc-100/80">
-                      <td colSpan={13} className="px-3 py-2">
+                      <td colSpan={12} className="px-3 py-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2 text-left">
-                            <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="grid h-7 w-7 place-items-center rounded-md hover:bg-white" aria-label="?? ??/???">
+                            <button type="button" onClick={() => toggleGroup(displayRow.groupKey)} className="grid h-7 w-7 place-items-center rounded-md hover:bg-white" aria-label="그룹 접기/펼치기">
                               {collapsed ? <ChevronRight className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />}
                             </button>
                             <input
                               value={displayRow.label}
                               onChange={(event) => onRenameGroup(displayRow.groupKey, event.target.value)}
                               className="h-7 min-w-[160px] rounded-md border border-transparent bg-transparent px-1 text-[12px] font-semibold text-zinc-800 outline-none hover:border-zinc-200 hover:bg-white focus:border-zinc-300 focus:bg-white"
-                              aria-label="???"
+                              aria-label="그룹명"
                             />
-                            <span className="text-[11px] font-medium text-zinc-400">? {displayRow.taskCount} tasks</span>
+                            <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
                             {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Button type="button" variant="outline" className="h-7 rounded-md border-zinc-200 bg-white px-2 text-[11px]" onClick={() => onAddTaskToGroup(displayRow.groupKey)}>
                               <Plus className="mr-1 h-3 w-3" />
-                              ?? ??
+                              작업 추가
                             </Button>
                             <button
                               type="button"
                               onClick={() => onDeleteGroup(displayRow.groupKey)}
                               className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
-                              aria-label="?? ??"
+                              aria-label="그룹 삭제"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -1055,19 +1036,6 @@ function EditableWbsTable({
                     </td>
                     <td className="px-2 py-2">
                       <CellInput value={row.wbs_id} invalid={issue?.missing.includes("wbs_id")} onChange={(value) => onUpdate(row.clientId, "wbs_id", value)} />
-                    </td>
-                    <td className="px-2 py-2">
-                      <select
-                        value={displayRow.groupKey}
-                        onChange={(event) => onMoveTaskToGroup(row.clientId, event.target.value)}
-                        className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12px] text-zinc-700 outline-none focus:border-zinc-400"
-                      >
-                        {groupOptions.map((group) => (
-                          <option key={group.groupKey} value={group.groupKey}>
-                            {group.label}
-                          </option>
-                        ))}
-                      </select>
                     </td>
                     <td className="px-2 py-2">
                       <CellInput value={row.task_name} invalid={issue?.missing.includes("task_name")} onChange={(value) => onUpdate(row.clientId, "task_name", value)} />
