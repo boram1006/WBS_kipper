@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GanttDependencyLayer } from "@/components/wbs/gantt-dependency-layer";
 import { resolveDependencyLinks, type DependencyLayoutItem } from "@/components/wbs/gantt-dependencies";
-import { getMilestonePosition, resolveMilestoneLabelVisibility } from "@/components/wbs/gantt-milestones";
+import { getMilestoneMarkerClass, getMilestonePosition, resolveMilestoneLabelVisibility } from "@/components/wbs/gantt-milestones";
 import { flattenVisibleRows, groupWbsTasks, isGroupRow, isTaskRow, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
 import {
   getGanttBarClass,
@@ -81,8 +81,8 @@ type DragAction = "move" | "resize-left" | "resize-right";
 
 const badgeConfig: Record<WbsBadge, { label: string; className: string }> = {
   recent: { label: "Recently updated", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
-  new: { label: "New task", className: "border-sky-200 bg-sky-50 text-sky-800" },
-  schedule: { label: "Schedule changed", className: "border-violet-200 bg-violet-50 text-violet-800" },
+  new: { label: "New task", className: "border-zinc-200 bg-zinc-50 text-zinc-700" },
+  schedule: { label: "Schedule changed", className: "border-[#FD312E]/25 bg-[#FD312E]/5 text-[#FD312E]" },
   owner: { label: "Owner changed", className: "border-amber-200 bg-amber-50 text-amber-800" },
   status: { label: "Status changed", className: "border-orange-200 bg-orange-50 text-orange-800" },
   confirm: { label: "Needs confirmation", className: "border-rose-200 bg-rose-50 text-rose-800" }
@@ -1101,14 +1101,21 @@ function GanttChart({
                   <div
                     key={marker.id}
                     className={cn(
-                      "absolute flex max-w-[96px] items-center gap-1 rounded bg-white/95 px-1 text-[10px] font-semibold tracking-normal shadow-[0_0_0_1px_rgba(255,255,255,0.85)]",
-                      marker.type === "today" ? "text-[#fd312e]" : "text-amber-700",
+                      "absolute flex max-w-[132px] items-center gap-1.5 rounded-full bg-white/95 text-[10px] font-semibold tracking-normal",
+                      marker.variant === "today" ? "px-1" : "border px-2 py-0.5",
+                      getMilestoneMarkerClass(marker).label,
                       timelineLabelClass(marker.left, timelineWidth)
                     )}
                     style={{ left: marker.left }}
                     title={marker.title}
                   >
-                    <span className="text-[9px] leading-none">?</span>
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 shrink-0",
+                        marker.variant === "today" ? "rounded-full" : "rotate-45 rounded-[1px]",
+                        getMilestoneMarkerClass(marker).marker
+                      )}
+                    />
                     {marker.display !== "hidden" && <span className="truncate">{marker.displayLabel}</span>}
                   </div>
                 ))}
@@ -1173,7 +1180,7 @@ function GanttChart({
                   </div>
                   <div className={cn("relative h-8 rounded-lg bg-zinc-50 transition-colors", highlighted && "bg-sky-100/60")}>
                     <div
-                      className="absolute bottom-0 top-0 z-10 w-px bg-[#fd312e]"
+                      className={cn("absolute bottom-0 top-0 z-10 w-px", getMilestoneMarkerClass({ label: "TODAY", type: "today" }).line)}
                       style={{ left: `${todayLeft}px` }}
                     />
                     {validMilestones.map((milestone) => {
@@ -1181,9 +1188,9 @@ function GanttChart({
                       return (
                         <div
                           key={milestone.id}
-                          className="absolute bottom-0 top-0 z-10 border-l border-dashed border-amber-400/80"
+                          className={cn("absolute bottom-0 top-0 z-10 border-l", getMilestoneMarkerClass({ label: milestone.label, type: "milestone" }).line)}
                           style={{ left: `${milestoneLeft}px` }}
-                          title={`${milestone.label} (${milestone.date})`}
+                          title={`${milestone.label}\n${milestone.date}`}
                         />
                       );
                     })}
