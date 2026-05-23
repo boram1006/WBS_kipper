@@ -42,7 +42,7 @@ export function getWbsStatusBadgeClass(status = "") {
   if (kind === "cancelled") return "border-zinc-200 bg-zinc-50 text-zinc-500";
   if (kind === "hold") return "border-amber-200 bg-amber-50 text-amber-800";
   if (kind === "progress") return "border-zinc-300 bg-zinc-50 text-zinc-700";
-  if (kind === "planned") return "border-zinc-200 bg-white text-zinc-600";
+  if (kind === "planned") return "border-amber-200 bg-amber-50 text-amber-800";
   return "border-zinc-200 bg-white text-zinc-600";
 }
 
@@ -70,8 +70,9 @@ export function getGanttBarClass(task: WbsStatusTask, today: string | number | D
   if (status === "completed") return "bg-zinc-200 opacity-70";
   if (status === "cancelled") return "bg-zinc-200 opacity-50";
   if (scheduleState === "delayed") return "border border-red-300/80 bg-red-200/60 ring-1 ring-red-200/70";
-  if (status === "hold") return "border border-amber-300/80 bg-amber-200/60";
+  if (status === "hold") return "border border-amber-300/90 bg-amber-100";
   if (status === "progress") return "bg-zinc-400/85";
+  if (status === "planned") return "border border-amber-300/60 bg-amber-200/60";
   return "bg-zinc-300/90";
 }
 
