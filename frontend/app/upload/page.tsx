@@ -41,7 +41,18 @@ import {
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { setActiveProjectId, useActiveProjectId } from "@/lib/use-project-id";
-import { loadWbsGroups, loadWbsMilestones, loadWbsSnapshot, saveWbsGroups, saveWbsMilestones, saveWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
+import {
+  loadWbsGroupAssignments,
+  loadWbsGroups,
+  loadWbsMilestones,
+  loadWbsSnapshot,
+  saveWbsGroupAssignments,
+  saveWbsGroups,
+  saveWbsMilestones,
+  saveWbsSnapshot,
+  type WbsGroupAssignment,
+  type WbsMilestone
+} from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type StandardColumn = {
@@ -55,6 +66,7 @@ type WbsEditableRow = {
   clientId: string;
   wbsId?: string;
   id?: string;
+  groupKey: string;
   wbs_id: string;
   task_name: string;
   description: string;
@@ -116,10 +128,18 @@ function createMilestone(): WbsMilestone {
   };
 }
 
-function rowFromValues(values: string[]): WbsEditableRow {
+function groupKeyFromAssignment(wbsId: string, taskName: string, assignments: WbsGroupAssignment[]) {
+  return assignments.find((assignment) => assignment.wbsId === wbsId)?.groupKey
+    || assignments.find((assignment) => assignment.taskName && assignment.taskName === taskName)?.groupKey
+    || getGroupKey({ wbsId, id: wbsId });
+}
+
+function rowFromValues(values: string[], groupKey?: string): WbsEditableRow {
+  const wbsId = values[0] ?? "";
   return {
     clientId: createClientId(),
-    wbs_id: values[0] ?? "",
+    groupKey: groupKey || getGroupKey({ wbsId, id: wbsId }),
+    wbs_id: wbsId,
     task_name: values[1] ?? "",
     description: values[2] ?? "",
     owner: values[3] ?? "",
@@ -202,8 +222,11 @@ function normalizeUploadedRows(text: string) {
   return { columns, rows: dataRows };
 }
 
-function editableRowsFromRaw(rawRows: Record<string, string>[]) {
-  return rawRows.map((raw) => rowFromValues(STANDARD_COLUMN_KEYS.map((key) => String(raw[key] ?? ""))));
+function editableRowsFromRaw(rawRows: Record<string, string>[], assignments: WbsGroupAssignment[] = []) {
+  return rawRows.map((raw) => {
+    const values = STANDARD_COLUMN_KEYS.map((key) => String(raw[key] ?? ""));
+    return rowFromValues(values, groupKeyFromAssignment(values[0] ?? "", values[1] ?? "", assignments));
+  });
 }
 
 function isIsoDate(value: string) {
@@ -279,9 +302,11 @@ export default function WbsSetupPage() {
   useEffect(() => {
     let alive = true;
     function showSavedSnapshot(snapshot: { rows_preview: Record<string, string>[] }) {
-      const nextRows = editableRowsFromRaw(snapshot.rows_preview);
+      const savedGroups = projectId ? loadWbsGroups(projectId) : [];
+      const assignments = projectId ? loadWbsGroupAssignments(projectId) : [];
+      const nextRows = editableRowsFromRaw(snapshot.rows_preview, assignments);
       setRows(nextRows);
-      setGroups(inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), projectId ? loadWbsGroups(projectId) : []));
+      setGroups(inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), savedGroups));
       setUploadedColumns([...STANDARD_COLUMN_KEYS]);
       setFileName("Saved WBS");
       setIsCreatingNewWbs(false);
@@ -347,7 +372,7 @@ export default function WbsSetupPage() {
   }
 
   function loadSample() {
-    const nextRows = SAMPLE_ROWS.map(rowFromValues);
+    const nextRows = SAMPLE_ROWS.map((values) => rowFromValues(values));
     setRows(nextRows);
     setGroups(inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groups));
     setUploadedColumns([...STANDARD_COLUMN_KEYS]);
@@ -430,7 +455,7 @@ export default function WbsSetupPage() {
   }
 
   function deleteGroupByKey(groupKey: string) {
-    const taskCount = rows.filter((row) => getGroupKey({ ...row, wbsId: row.wbs_id, id: row.wbs_id }) === groupKey).length;
+    const taskCount = rows.filter((row) => row.groupKey === groupKey).length;
     if (taskCount > 0) {
       setError("작업이 있는 그룹은 삭제할 수 없습니다. 먼저 작업을 다른 그룹으로 이동하거나 삭제하세요.");
       return;
@@ -440,7 +465,14 @@ export default function WbsSetupPage() {
   }
 
   function addTaskToGroup(groupKey: string) {
-    setRows((current) => [...current, { ...emptyRow(current.length + 1), wbs_id: getNextWbsIdForGroup(current.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groupKey) }]);
+    setRows((current) => [
+      ...current,
+      {
+        ...emptyRow(current.length + 1),
+        groupKey,
+        wbs_id: getNextWbsIdForGroup(current.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), groupKey)
+      }
+    ]);
     setMessage("선택한 그룹에 새 작업을 추가했습니다.");
     setError(null);
   }
@@ -476,6 +508,12 @@ export default function WbsSetupPage() {
       const targetIndex = current.findIndex((row) => row.clientId === targetClientId);
       if (sourceIndex < 0 || targetIndex < 0) return current;
       const next = [...current];
+      const source = next[sourceIndex];
+      const target = next[targetIndex];
+      if (source.groupKey !== target.groupKey) {
+        setError("작업 순서는 같은 그룹 안에서만 변경할 수 있습니다. 다른 그룹으로 옮기려면 해당 그룹에서 작업을 추가하거나 WBS_ID를 직접 조정하세요.");
+        return current;
+      }
       const [moved] = next.splice(sourceIndex, 1);
       next.splice(targetIndex, 0, moved);
       return next;
@@ -537,6 +575,10 @@ export default function WbsSetupPage() {
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
       saveWbsGroups(targetProjectId, groups);
+      saveWbsGroupAssignments(
+        targetProjectId,
+        rows.map((row) => ({ wbsId: row.wbs_id, taskName: row.task_name, groupKey: row.groupKey }))
+      );
       saveWbsMilestones(targetProjectId, validMilestones());
       setIsCreatingNewWbs(false);
       setNewWbsName("");

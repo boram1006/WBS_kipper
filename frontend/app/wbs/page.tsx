@@ -35,11 +35,22 @@ import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { WbsColumnMapping } from "@/lib/types";
 import { useActiveProjectId } from "@/lib/use-project-id";
-import { loadWbsGroups, loadWbsMilestones, loadWbsSnapshot, saveWbsSnapshot, type CachedWbsSnapshot, type WbsMilestone } from "@/lib/wbs-cache";
+import {
+  loadWbsGroupAssignments,
+  loadWbsGroups,
+  loadWbsMilestones,
+  loadWbsSnapshot,
+  saveWbsGroupAssignments,
+  saveWbsSnapshot,
+  type CachedWbsSnapshot,
+  type WbsGroupAssignment,
+  type WbsMilestone
+} from "@/lib/wbs-cache";
 import { cn } from "@/lib/utils";
 
 type WbsRow = {
   wbsId: string;
+  groupKey?: string;
   taskName: string;
   description: string;
   owner: string;
@@ -206,12 +217,18 @@ function inferTaskSource(raw: Record<string, string>) {
   return source && source !== "-" ? source : "WBS 설정에서 직접 등록 또는 가져온 작업";
 }
 
-function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnapshot["mapping"] = {}): WbsRow[] {
+function groupKeyFromAssignment(wbsId: string, taskName: string, assignments: WbsGroupAssignment[]) {
+  return assignments.find((assignment) => assignment.wbsId === wbsId)?.groupKey
+    || assignments.find((assignment) => assignment.taskName && assignment.taskName === taskName)?.groupKey;
+}
+
+function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnapshot["mapping"] = {}, assignments: WbsGroupAssignment[] = []): WbsRow[] {
   return rows.map((raw, index) => {
     const wbsId = mappedValue(raw, mapping?.id, ["wbs_id", "wbs id", "wbs코드", "id", "_row_id"], `${index + 1}`);
     const taskName = mappedValue(raw, mapping?.task_name, ["task_name", "task name", "작업명", "task", "name"], `Task ${index + 1}`);
     return {
       wbsId,
+      groupKey: groupKeyFromAssignment(wbsId, taskName, assignments),
       taskName,
       description: mappedValue(raw, mapping?.description, ["description", "설명"], ""),
       owner: mappedValue(raw, mapping?.owner, ["owner", "담당자", "assignee"], "미정"),
@@ -298,8 +315,9 @@ export default function CurrentWbsPage() {
     let alive = true;
     async function load() {
       const cached = loadWbsSnapshot(projectId);
+      const assignments = loadWbsGroupAssignments(projectId);
       if (cached?.rows_preview?.length) {
-        const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping);
+        const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping, assignments);
         setRows(cachedRows);
         setSavedRows(cachedRows);
         setActiveId(null);
@@ -315,7 +333,7 @@ export default function CurrentWbsPage() {
       try {
         if (!projectId) throw new Error("프로젝트 ID가 없습니다.");
         const snapshot = await api.getWbs(projectId);
-        const parsed = normalizeRawRows(snapshot.rows_preview);
+        const parsed = normalizeRawRows(snapshot.rows_preview, {}, assignments);
         if (!alive) return;
         setRows(parsed);
         setSavedRows(parsed);
@@ -327,7 +345,7 @@ export default function CurrentWbsPage() {
       } catch (err) {
         if (!alive) return;
         if (cached?.rows_preview?.length) {
-          const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping);
+          const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping, assignments);
           setRows(cachedRows);
           setSavedRows(cachedRows);
           setActiveId(null);
@@ -465,7 +483,9 @@ export default function CurrentWbsPage() {
     try {
       const snapshot = await uploadAndMapStandardWbs(projectId, rows);
       saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
-      const parsed = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING);
+      const assignments = rows.map((row) => ({ wbsId: row.wbsId, taskName: row.taskName, groupKey: row.groupKey || "" })).filter((assignment) => assignment.groupKey);
+      saveWbsGroupAssignments(projectId, assignments);
+      const parsed = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING, assignments);
       setRows(parsed);
       setSavedRows(parsed);
       setMode("view");

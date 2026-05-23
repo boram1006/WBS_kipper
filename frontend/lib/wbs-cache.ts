@@ -4,11 +4,18 @@ import type { WbsGroup } from "@/components/wbs/wbs-grouping";
 const WBS_SNAPSHOT_KEY = "wbs_keeper_wbs_snapshot";
 const WBS_MILESTONES_KEY = "wbs_keeper_wbs_milestones";
 const WBS_GROUPS_KEY = "wbs_keeper_wbs_groups";
+const WBS_GROUP_ASSIGNMENTS_KEY = "wbs_keeper_wbs_group_assignments";
 
 export type WbsMilestone = {
   id: string;
   label: string;
   date: string;
+};
+
+export type WbsGroupAssignment = {
+  wbsId: string;
+  taskName: string;
+  groupKey: string;
 };
 
 export type CachedWbsSnapshot = WbsUploadResponse & {
@@ -26,6 +33,10 @@ function milestoneKey(projectId: string | number) {
 
 function groupsKey(projectId: string | number) {
   return `${WBS_GROUPS_KEY}:${projectId}`;
+}
+
+function groupAssignmentsKey(projectId: string | number) {
+  return `${WBS_GROUP_ASSIGNMENTS_KEY}:${projectId}`;
 }
 
 export function saveWbsSnapshot(projectId: string | number, snapshot: WbsUploadResponse, mapping?: Partial<WbsColumnMapping>) {
@@ -80,6 +91,25 @@ export function loadWbsGroups(projectId: string | number): WbsGroup[] {
     const parsed = JSON.parse(raw) as WbsGroup[];
     return Array.isArray(parsed)
       ? parsed.filter((item) => item.groupKey && item.label && Number.isFinite(item.order))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveWbsGroupAssignments(projectId: string | number, assignments: WbsGroupAssignment[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(groupAssignmentsKey(projectId), JSON.stringify(assignments));
+}
+
+export function loadWbsGroupAssignments(projectId: string | number): WbsGroupAssignment[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(groupAssignmentsKey(projectId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as WbsGroupAssignment[];
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => item.wbsId && item.groupKey)
       : [];
   } catch {
     return [];
