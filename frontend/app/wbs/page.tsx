@@ -268,9 +268,9 @@ function formatShortDate(time: number) {
   return new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit" }).format(new Date(time));
 }
 
-function timelineLabelClass(left: number) {
-  if (left < 8) return "translate-x-0 text-left";
-  if (left > 92) return "-translate-x-full text-right";
+function timelineLabelClass(left: number, width: number) {
+  if (left < 66) return "translate-x-0 text-left";
+  if (width - left < 66) return "-translate-x-full text-right";
   return "-translate-x-1/2 text-center";
 }
 
@@ -302,7 +302,7 @@ export default function CurrentWbsPage() {
   const [changeTypeFilter, setChangeTypeFilter] = useState<(typeof changeTypeOptions)[number]["value"]>("all");
   const [showCompletedInGantt, setShowCompletedInGantt] = useState(true);
   const [ganttHeight, setGanttHeight] = useState(320);
-  const [ganttZoom, setGanttZoom] = useState<GanttZoom>("week");
+  const [ganttZoom, setGanttZoom] = useState<GanttZoom>("month");
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
   const [groups, setGroups] = useState<ReturnType<typeof loadWbsGroups>>([]);
 
@@ -972,7 +972,7 @@ function GanttChart({
           <p className="text-xs text-zinc-500">
             {mode === "edit" ? "드래그해서 일정을 조정할 수 있습니다." : "빨간 기준선은 오늘 날짜입니다."}
           </p>
-          <div className="flex flex-wrap items-center justify-end gap-3 rounded-lg border border-zinc-100 bg-zinc-50/60 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-2">
               <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-white p-0.5">
                 {(["week", "month"] as const).map((item) => (
@@ -990,7 +990,7 @@ function GanttChart({
                 ))}
               </div>
             </div>
-            <div className="h-5 w-px bg-zinc-200" />
+            <div className="h-5 w-px bg-zinc-200/70" />
             <div className="flex h-8 items-center gap-2 text-[11.5px] font-medium text-zinc-700">
               <span>완료 숨김</span>
               <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
@@ -1019,7 +1019,7 @@ function GanttChart({
                 return (
                   <span
                     key={milestone.id}
-                    className={cn("absolute -top-0.5 max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold text-violet-700", timelineLabelClass(left))}
+                    className={cn("absolute -top-0.5 max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold text-violet-700", timelineLabelClass(left, timelineWidth))}
                     style={{ left }}
                     title={`${milestone.label} (${formatShortDate(toTime(milestone.date)!)})`}
                   >
@@ -1071,7 +1071,7 @@ function GanttChart({
                   onMouseEnter={() => onHover(row.wbsId)}
                   onMouseLeave={() => onHover(null)}
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 pl-4">
                     <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
                     <div className="mt-0.5 flex min-w-0 items-center gap-2">
                       <p className="shrink-0 font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
