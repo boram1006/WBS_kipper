@@ -1472,7 +1472,7 @@ function Th({ children }: { children: ReactNode }) {
 }
 
 function Td({ children, className }: { children: ReactNode; className?: string }) {
-  return <td className={cn("whitespace-nowrap px-3 py-3 align-top text-zinc-700", className)}>{children}</td>;
+  return <td className={cn("whitespace-nowrap px-3 py-3 align-middle text-zinc-700", className)}>{children}</td>;
 }
 
 function LoadingState() {
