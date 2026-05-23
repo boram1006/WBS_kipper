@@ -1042,23 +1042,24 @@ function GanttChart({
               ))}
               <div className="absolute left-0 top-6 h-8 w-full border-t border-zinc-100">
                 {milestoneMarkers.map((marker) => (
-                  <span
+                  <div
                     key={marker.id}
                     className={cn(
-                      "absolute max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold tracking-normal",
+                      "absolute flex max-w-[132px] flex-col items-center gap-0.5 rounded bg-white px-1 text-[10px] font-semibold tracking-normal",
                       marker.tone === "today" ? "text-[#fd312e]" : "text-violet-700",
                       timelineLabelClass(marker.left, timelineWidth)
                     )}
                     style={{ left: marker.left, top: marker.lane * 14 }}
                     title={marker.label}
                   >
-                    {marker.label}
-                  </span>
+                    <span className="leading-none">▲</span>
+                    <span className="max-w-[132px] truncate">{marker.label}</span>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
-          <div className="relative space-y-2">
+          <div className="relative">
             <div className="pointer-events-none absolute top-0 z-20" style={{ left: 232, width: timelineWidth, height: ganttRowsHeight }}>
               <GanttDependencyLayer
                 links={dependencyLinks}

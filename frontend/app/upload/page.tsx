@@ -1019,16 +1019,17 @@ function EditableWbsTable({
                             <input
                               value={displayRow.label}
                               onChange={(event) => onRenameGroup(displayRow.groupKey, event.target.value)}
-                              className="h-7 min-w-[160px] rounded-md border border-transparent bg-transparent px-1 text-[12px] font-semibold text-zinc-800 outline-none hover:border-zinc-200 hover:bg-white focus:border-zinc-300 focus:bg-white"
+                              className="h-7 rounded-md border border-transparent bg-transparent px-1 text-[12px] font-semibold text-zinc-800 outline-none hover:border-zinc-200 hover:bg-white focus:border-zinc-300 focus:bg-white"
+                              style={{ width: Math.max(7, Math.min(26, Array.from(displayRow.label || "").length + 1)) + "em" }}
                               aria-label="그룹명"
                             />
-                            <span className="text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
+                            <span className="shrink-0 text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
                             {collapsed && <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Button type="button" variant="outline" className="h-7 rounded-md border-zinc-200 bg-white px-2 text-[11px]" onClick={() => onAddTaskToGroup(displayRow.groupKey)}>
                               <Plus className="mr-1 h-3 w-3" />
-                              작업 추가
+                              ?? ??
                             </Button>
                             <button
                               type="button"
