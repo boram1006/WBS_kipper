@@ -1099,7 +1099,7 @@ function GanttChart({
       ) : (
         <>
         <div ref={scrollRef} className={cn("px-4 py-3", zoom === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto")} style={{ height }}>
-          <div className="mb-2 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
+          <div className="mb-2 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
             <span className="pt-1">Task</span>
             <div className="relative h-9">
               {ticks.map((tick) => (
@@ -1149,7 +1149,7 @@ function GanttChart({
                 return (
                   <div
                     key={`group-${displayRow.groupKey}`}
-                    className="grid items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-100/80 text-[12px] shadow-[inset_0_-1px_0_rgba(212,212,216,0.65)]"
+                    className="grid items-center gap-3 rounded-lg border border-[#FD312E]/15 bg-[#FD312E]/[0.04] text-[12px] shadow-[inset_0_-1px_0_rgba(253,49,46,0.08)]"
                     style={{
                       gridTemplateColumns: `220px ${timelineWidth}px`,
                       minHeight: GANTT_GROUP_ROW_HEIGHT,
@@ -1158,13 +1158,13 @@ function GanttChart({
                     }}
                   >
                     <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="flex min-w-0 items-center gap-2 px-2 text-left">
-                      {collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
-                      <span className="truncate font-semibold text-zinc-800">{displayRow.label}</span>
+                      {collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#FD312E]/70" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#FD312E]/70" />}
+                      <span className="truncate font-semibold text-zinc-900">{displayRow.label}</span>
                       <span className="shrink-0 text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
                       {collapsed && <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
                     </button>
-                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="h-full rounded-r-lg bg-zinc-100/80 text-left">
-                      <div className="h-px w-full bg-zinc-300/70" />
+                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="h-full rounded-r-lg bg-[#FD312E]/[0.035] text-left hover:bg-[#FD312E]/[0.06]">
+                      <div className="h-px w-full bg-[#FD312E]/15" />
                     </button>
                   </div>
                 );
@@ -1175,7 +1175,7 @@ function GanttChart({
               return (
                 <div
                   key={row.wbsId}
-                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-zinc-100")}
+                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-[#FD312E]/[0.045]")}
                   style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_ROW_HEIGHT }}
                   onMouseEnter={() => onHover(row.wbsId)}
                   onMouseLeave={() => onHover(null)}
@@ -1189,7 +1189,7 @@ function GanttChart({
                       </span>
                     </div>
                   </div>
-                  <div className={cn("relative h-8 rounded-lg bg-zinc-50 transition-colors", highlighted && "bg-zinc-100")}>
+                  <div className={cn("relative h-8 rounded-lg bg-zinc-50 transition-colors", highlighted && "bg-[#FD312E]/[0.035]")}>
                     <div
                       className={cn("absolute bottom-0 top-0 z-10 w-px", getMilestoneMarkerClass({ label: "TODAY", type: "today" }).line)}
                       style={{ left: `${todayLeft}px` }}
@@ -1218,12 +1218,12 @@ function GanttChart({
                         className={cn(
                           "absolute top-1/2 h-4 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
                           getGanttBarClass(row, todayTime),
-                          highlighted && "h-5 shadow-md ring-2 ring-[#FD312E]/25",
+                          highlighted && "h-5 shadow-md ring-2 ring-[#FD312E]/30",
                           mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                         )}
                         style={{ left: `${geometry.left}px`, width: `${geometry.width}px` }}
                       >
-                        {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1 rounded-l-full bg-[#FD312E]" />}
+                        {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-full bg-[#FD312E]" />}
                         {mode === "edit" && (
                           <>
                             <span

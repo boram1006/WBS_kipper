@@ -46,8 +46,8 @@ export function GanttDependencyLayer({ links, layouts, width, height, muted }: P
               markerEnd="url(#dependency-arrow)"
               className={cn(
                 "fill-none transition-opacity",
-                "stroke-slate-400 opacity-35",
-                muted && "opacity-15"
+                "stroke-slate-400 opacity-45",
+                muted && "opacity-20"
               )}
               strokeWidth={1.25}
               strokeDasharray="4 4"

@@ -67,11 +67,11 @@ export function getScheduleState(task: WbsStatusTask, today: string | number | D
 export function getGanttBarClass(task: WbsStatusTask, today: string | number | Date = new Date()) {
   const status = normalizeWbsStatus(task.status);
   const scheduleState = getScheduleState(task, today);
-  const delayedAccent = scheduleState === "delayed" ? "ring-1 ring-[#FD312E]/30" : "";
+  const delayedAccent = scheduleState === "delayed" ? "ring-1 ring-[#FD312E]/35" : "";
   if (status === "completed") return `bg-zinc-200 opacity-60 ${delayedAccent}`;
   if (status === "cancelled") return `bg-zinc-200 opacity-45 ${delayedAccent}`;
   if (status === "hold") return `border-amber-300/70 bg-amber-200/70 ${delayedAccent}`;
-  return `bg-zinc-300/85 ${delayedAccent}`;
+  return `bg-zinc-400/95 ${delayedAccent}`;
 }
 
 export function getScheduleBadge(task: WbsStatusTask, today: string | number | Date = new Date()) {
