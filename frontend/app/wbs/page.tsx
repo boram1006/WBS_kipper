@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GanttDependencyLayer } from "@/components/wbs/gantt-dependency-layer";
 import { resolveDependencyLinks, type DependencyLayoutItem } from "@/components/wbs/gantt-dependencies";
+import { getMilestonePosition, resolveMilestoneLabelVisibility } from "@/components/wbs/gantt-milestones";
 import { flattenVisibleRows, groupWbsTasks, isGroupRow, isTaskRow, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
 import {
   getGanttBarClass,
@@ -101,7 +102,8 @@ const STANDARD_COLUMNS = ["wbs_id", "task_name", "description", "owner", "start_
 const DAY_MS = 24 * 60 * 60 * 1000;
 const GANTT_ROW_HEIGHT = 40;
 const GANTT_GROUP_ROW_HEIGHT = 34;
-const GANTT_GROUP_GAP = 10;
+const GANTT_GROUP_TOP_GAP = 14;
+const GANTT_GROUP_BOTTOM_GAP = 10;
 const GANTT_BAR_HEIGHT = 32;
 
 const STANDARD_MAPPING = {
@@ -862,23 +864,16 @@ function GanttChart({
   const ticks = Array.from({ length: Math.floor(totalDays / tickEveryDays) + 1 }, (_, index) => min + index * tickEveryDays * DAY_MS);
   const milestoneMarkers = useMemo(() => {
     const markers = [
-      { id: "today", label: `TODAY (${formatShortDate(todayTime)})`, left: todayLeft, tone: "today" as const },
+      { id: "today", label: "TODAY", dateLabel: formatShortDate(todayTime), left: todayLeft, type: "today" as const },
       ...validMilestones.map((milestone) => ({
         id: milestone.id,
-        label: `${milestone.label} (${formatShortDate(toTime(milestone.date)!)})`,
-        left: Math.max(0, Math.min(timelineWidth, ((toTime(milestone.date)! - min) / DAY_MS) * pxPerDay)),
-        tone: "milestone" as const
+        label: milestone.label,
+        dateLabel: formatShortDate(toTime(milestone.date)!),
+        left: getMilestonePosition(toTime(milestone.date)!, min, pxPerDay, timelineWidth),
+        type: "milestone" as const
       }))
     ].sort((a, b) => a.left - b.left);
-
-    let previousLeft = -Infinity;
-    let previousLane = 0;
-    return markers.map((marker) => {
-      const lane = marker.left - previousLeft < 118 ? (previousLane + 1) % 2 : 0;
-      previousLeft = marker.left;
-      previousLane = lane;
-      return { ...marker, lane };
-    });
+    return resolveMilestoneLabelVisibility(markers, zoom === "week" ? 96 : 72);
   }, [min, pxPerDay, timelineWidth, todayLeft, todayTime, validMilestones]);
   const [dragTooltip, setDragTooltip] = useState<{ wbsId: string; text: string; left: number; top: number } | null>(null);
 
@@ -900,7 +895,7 @@ function GanttChart({
     let cursorY = 0;
     displayRowsAfterStatus.forEach((displayRow, index) => {
       if (isGroupRow(displayRow)) {
-        cursorY += GANTT_GROUP_ROW_HEIGHT + (index === 0 ? 0 : GANTT_GROUP_GAP);
+        cursorY += (index === 0 ? 0 : GANTT_GROUP_TOP_GAP) + GANTT_GROUP_ROW_HEIGHT + GANTT_GROUP_BOTTOM_GAP;
         return;
       }
       const geometry = barGeometry(displayRow.task);
@@ -919,7 +914,7 @@ function GanttChart({
   const ganttRowsHeight = useMemo(
     () =>
       displayRowsAfterStatus.reduce((height, row, index) => {
-        if (isGroupRow(row)) return height + GANTT_GROUP_ROW_HEIGHT + (index === 0 ? 0 : GANTT_GROUP_GAP);
+        if (isGroupRow(row)) return height + (index === 0 ? 0 : GANTT_GROUP_TOP_GAP) + GANTT_GROUP_ROW_HEIGHT + GANTT_GROUP_BOTTOM_GAP;
         return height + GANTT_ROW_HEIGHT;
       }, 0),
     [displayRowsAfterStatus]
@@ -1085,28 +1080,28 @@ function GanttChart({
       ) : (
         <>
         <div ref={scrollRef} className={cn("px-4 py-3", zoom === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto")} style={{ height }}>
-          <div className="mb-3 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
+          <div className="mb-2 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
             <span className="pt-1">Task</span>
-            <div className="relative h-14">
+            <div className="relative h-9">
               {ticks.map((tick) => (
                 <span key={tick} className="absolute top-0 -translate-x-1/2" style={{ left: `${((tick - min) / DAY_MS) * pxPerDay}px` }}>
                   {formatShortDate(tick)}
                 </span>
               ))}
-              <div className="absolute left-0 top-6 h-8 w-full border-t border-zinc-100">
+              <div className="absolute left-0 top-5 h-4 w-full">
                 {milestoneMarkers.map((marker) => (
                   <div
                     key={marker.id}
                     className={cn(
-                      "absolute flex max-w-[132px] flex-col items-center gap-0.5 rounded bg-white px-1 text-[10px] font-semibold tracking-normal",
-                      marker.tone === "today" ? "text-[#fd312e]" : "text-amber-700",
+                      "absolute flex max-w-[96px] items-center gap-1 rounded bg-white/95 px-1 text-[10px] font-semibold tracking-normal shadow-[0_0_0_1px_rgba(255,255,255,0.85)]",
+                      marker.type === "today" ? "text-[#fd312e]" : "text-amber-700",
                       timelineLabelClass(marker.left, timelineWidth)
                     )}
-                    style={{ left: marker.left, top: marker.lane * 14 }}
-                    title={marker.label}
+                    style={{ left: marker.left }}
+                    title={marker.title}
                   >
-                    <span className="leading-none">▲</span>
-                    <span className="max-w-[132px] truncate">{marker.label}</span>
+                    <span className="text-[9px] leading-none">?</span>
+                    {marker.display !== "hidden" && <span className="truncate">{marker.displayLabel}</span>}
                   </div>
                 ))}
               </div>
