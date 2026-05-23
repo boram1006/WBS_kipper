@@ -54,7 +54,9 @@ export function getGroupKey(task: WbsGroupingTask) {
 }
 
 export function getGroupLabel(groupKey: string, groups: WbsGroup[] = []) {
-  return groups.find((group) => group.groupKey === groupKey)?.label || GROUP_LABELS[groupKey] || "기타 작업";
+  const savedGroup = groups.find((group) => group.groupKey === groupKey);
+  if (savedGroup) return savedGroup.label;
+  return GROUP_LABELS[groupKey] || "기타 작업";
 }
 
 export function groupWbsTasks<TTask extends WbsGroupingTask>(tasks: TTask[], groups: WbsGroup[] = []): WbsDisplayRow<TTask>[] {
@@ -108,7 +110,7 @@ export function createNewGroup(existingGroups: WbsGroup[]): WbsGroup {
 }
 
 export function renameGroup(groups: WbsGroup[], groupKey: string, label: string) {
-  return groups.map((group) => (group.groupKey === groupKey ? { ...group, label: label.trim() || group.label } : group));
+  return groups.map((group) => (group.groupKey === groupKey ? { ...group, label } : group));
 }
 
 export function deleteGroup(groups: WbsGroup[], groupKey: string) {
