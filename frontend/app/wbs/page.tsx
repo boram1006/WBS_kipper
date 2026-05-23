@@ -1175,9 +1175,7 @@ function GanttChart({
                       <span className="shrink-0 text-[11px] font-medium text-zinc-400">· {displayRow.taskCount} tasks</span>
                       {collapsed && <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">collapsed</span>}
                     </button>
-                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="h-full rounded-r-lg bg-zinc-50 text-left hover:bg-zinc-100">
-                      <div className="h-px w-full bg-zinc-300/70" />
-                    </button>
+                    <button type="button" onClick={() => onToggleGroup(displayRow.groupKey)} className="h-full rounded-r-lg bg-zinc-50 text-left hover:bg-zinc-100" aria-label={`${displayRow.label} group toggle`} />
                   </div>
                 );
               }
@@ -1201,7 +1199,7 @@ function GanttChart({
                       </span>
                     </div>
                   </div>
-                  <div className={cn("relative h-6 rounded-md bg-zinc-50 transition-colors", highlighted && "bg-red-50/40")}>
+                  <div className={cn("relative h-7 rounded-md bg-zinc-50 transition-colors", highlighted && "bg-red-50/40")}>
                     <div
                       className={cn("absolute bottom-0 top-0 z-10 w-px", getMilestoneMarkerClass({ label: "TODAY", type: "today" }).line)}
                       style={{ left: `${todayLeft}px` }}
