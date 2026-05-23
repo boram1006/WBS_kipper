@@ -1230,9 +1230,9 @@ function GanttChart({
                       >
                         <span
                           className={cn(
-                            "pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
+                            "pointer-events-none absolute inset-x-0 top-1/2 h-3.5 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
                             getGanttBarClass(row, todayTime),
-                            highlighted && "h-3.5 shadow-md ring-2 ring-red-200"
+                            highlighted && "h-4 shadow-md ring-2 ring-red-200"
                           )}
                         >
                           {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-full bg-red-300" />}
