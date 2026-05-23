@@ -325,6 +325,7 @@ export default function CurrentWbsPage() {
   const [ganttZoom, setGanttZoom] = useState<GanttZoom>("fit");
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
   const [groups, setGroups] = useState<ReturnType<typeof loadWbsGroups>>([]);
+  const tableDetailRef = useRef<HTMLDivElement | null>(null);
   const currentDay = useMemo(() => {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
@@ -335,6 +336,18 @@ export default function CurrentWbsPage() {
     setMilestones(projectId ? loadWbsMilestones(projectId) : []);
     setGroups(projectId ? loadWbsGroups(projectId) : []);
   }, [projectId]);
+
+  useEffect(() => {
+    if (!activeId || mode !== "view") return;
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (tableDetailRef.current?.contains(target)) return;
+      setActiveId(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+  }, [activeId, mode]);
 
   useEffect(() => {
     let alive = true;
@@ -611,7 +624,7 @@ export default function CurrentWbsPage() {
                   onToggleGroup={toggleGroup}
                 />
 
-                <div className={cn("grid gap-4", activeRow && mode === "view" ? "xl:grid-cols-[minmax(0,1fr)_380px]" : "grid-cols-1")}>
+                <div ref={tableDetailRef} className={cn("grid gap-4", activeRow && mode === "view" ? "xl:grid-cols-[minmax(0,1fr)_380px]" : "grid-cols-1")}>
                   <section className="min-w-0 rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-3">
                     <div className="relative min-w-[240px] flex-1">
@@ -670,7 +683,7 @@ export default function CurrentWbsPage() {
                             <tr
                               key={row.wbsId}
                               onClick={() => {
-                                if (mode === "view") setActiveId(row.wbsId);
+                                if (mode === "view") setActiveId((current) => (current === row.wbsId ? null : row.wbsId));
                               }}
                               onMouseEnter={() => setHoveredId(row.wbsId)}
                               onMouseLeave={() => setHoveredId(null)}
