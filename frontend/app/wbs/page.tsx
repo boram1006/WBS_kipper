@@ -26,6 +26,8 @@ import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { ProjectSelector } from "@/components/project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { GanttDependencyLayer } from "@/components/wbs/gantt-dependency-layer";
+import { resolveDependencyLinks, type DependencyLayoutItem } from "@/components/wbs/gantt-dependencies";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { WbsColumnMapping } from "@/lib/types";
@@ -74,6 +76,7 @@ const changeTypeOptions = [
 
 const STANDARD_COLUMNS = ["wbs_id", "task_name", "description", "owner", "start_date", "due_date", "status", "dependency", "notes"] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const GANTT_ROW_HEIGHT = 40;
 
 const STANDARD_MAPPING = {
   id: "wbs_id",
@@ -756,6 +759,25 @@ function GanttChart({
   const tickEveryDays = zoom === "week" ? 7 : 30;
   const ticks = Array.from({ length: Math.floor(totalDays / tickEveryDays) + 1 }, (_, index) => min + index * tickEveryDays * DAY_MS);
   const [dragTooltip, setDragTooltip] = useState<{ wbsId: string; text: string; left: number; top: number } | null>(null);
+  const rowLayouts = useMemo(() => {
+    const layouts = new Map<string, DependencyLayoutItem>();
+    visibleRows.forEach((row, rowIndex) => {
+      const geometry = barGeometry(row);
+      if (geometry) layouts.set(row.wbsId, { ...geometry, rowIndex });
+    });
+    return layouts;
+  }, [visibleRows, min, pxPerDay]);
+  const dependencyLinks = useMemo(
+    () =>
+      resolveDependencyLinks(
+        visibleRows.map((row) => ({
+          id: row.wbsId,
+          taskName: row.taskName,
+          dependency: row.dependency
+        }))
+      ),
+    [visibleRows]
+  );
 
   function barGeometry(row: WbsRow) {
     const start = toTime(row.startDate);
@@ -870,7 +892,6 @@ function GanttChart({
           </p>
           <div className="flex flex-wrap items-center justify-end gap-3 rounded-lg border border-zinc-100 bg-zinc-50/60 px-3 py-2">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">보기 단위</span>
               <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-white p-0.5">
                 {(["week", "month"] as const).map((item) => (
                   <button
@@ -889,7 +910,6 @@ function GanttChart({
             </div>
             <div className="h-5 w-px bg-zinc-200" />
             <div className="flex h-8 items-center gap-2 text-[11.5px] font-medium text-zinc-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">표시 옵션</span>
               <span>완료 숨김</span>
               <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
             </div>
@@ -927,7 +947,17 @@ function GanttChart({
               })}
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="relative space-y-2">
+            <div className="absolute top-0 z-20" style={{ left: 232, width: timelineWidth, height: visibleRows.length * GANTT_ROW_HEIGHT }}>
+              <GanttDependencyLayer
+                links={dependencyLinks}
+                layouts={rowLayouts}
+                rowHeight={GANTT_ROW_HEIGHT}
+                width={timelineWidth}
+                height={visibleRows.length * GANTT_ROW_HEIGHT}
+                muted={dragTooltip != null}
+              />
+            </div>
             {visibleRows.map((row) => {
               const geometry = barGeometry(row);
               const highlighted = hoveredId === row.wbsId || activeId === row.wbsId;
@@ -944,7 +974,7 @@ function GanttChart({
                     <div className="mt-0.5 flex min-w-0 items-center gap-2">
                       <p className="shrink-0 font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
                       <span className="min-w-0 truncate rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500">
-                        담당: {row.owner && row.owner !== "-" ? row.owner : "담당자 미정"}
+                        {row.owner && row.owner !== "-" ? row.owner : "담당자 미정"}
                       </span>
                     </div>
                   </div>

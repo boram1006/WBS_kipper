@@ -21,6 +21,7 @@ import {
   Wand2
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { buildApplyImpactPreview } from "@/components/meeting/impact-preview-utils";
 import { ProjectSelector } from "@/components/project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -483,6 +484,8 @@ function CandidateReviewPanel({
   wbsRows: WbsRowRecord[];
 }) {
   const rowMap = useMemo(() => new Map(wbsRows.map((row) => [row.wbs_id, row])), [wbsRows]);
+  const selectedCandidates = useMemo(() => candidates.filter((candidate) => selected.has(candidate.id)), [candidates, selected]);
+  const impactPreview = useMemo(() => buildApplyImpactPreview(selectedCandidates, wbsRows), [selectedCandidates, wbsRows]);
 
   return (
     <Panel
@@ -582,7 +585,8 @@ function CandidateReviewPanel({
             );
           })}
         </div>
-        <div className="flex justify-end border-t border-zinc-100 bg-zinc-50 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 bg-zinc-50 px-4 py-3">
+          <ImpactPreviewCard preview={impactPreview} />
           <Button
             type="button"
             className="h-9 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800"
@@ -595,6 +599,45 @@ function CandidateReviewPanel({
         </>
       )}
     </Panel>
+  );
+}
+
+function ImpactPreviewCard({ preview }: { preview: ReturnType<typeof buildApplyImpactPreview> }) {
+  if (preview.selectedCount === 0) {
+    return <div className="text-[12px] text-zinc-500">변경 후보를 선택하면 적용 전 영향 요약이 표시됩니다.</div>;
+  }
+
+  return (
+    <div className="max-w-3xl rounded-xl border border-sky-100 bg-white px-3 py-2 text-[11.5px] leading-5 text-zinc-600 shadow-sm">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span className="font-semibold text-zinc-900">Impact preview</span>
+        <ImpactPill label="선택" value={preview.selectedCount} />
+        <ImpactPill label="신규" value={preview.newTaskCount} />
+        <ImpactPill label="일정" value={preview.scheduleChangeCount} />
+        <ImpactPill label="담당/상태" value={preview.ownerStatusChangeCount} />
+        <ImpactPill label="의존성" value={preview.dependencyChangeCount} />
+        <ImpactPill label="확인 필요" value={preview.confirmationNeededCount} />
+      </div>
+      {preview.downstreamTasks.length > 0 ? (
+        <p>
+          선택한 변경은 dependency가 있는 후속 task {preview.downstreamTasks.length}개와 연결되어 있습니다:{" "}
+          <span className="font-medium text-zinc-800">
+            {preview.downstreamTasks.map((task) => `${task.wbsId} ${task.taskName}`).join(", ")}
+          </span>
+          . 후속 일정은 자동 변경되지 않습니다.
+        </p>
+      ) : (
+        <p>선택한 변경 후보 기준으로 직접 연결된 후속 task는 계산되지 않았습니다. 후속 일정은 자동 변경되지 않습니다.</p>
+      )}
+    </div>
+  );
+}
+
+function ImpactPill({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-zinc-600">
+      {label} {value}
+    </span>
   );
 }
 
