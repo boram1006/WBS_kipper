@@ -104,7 +104,7 @@ const GANTT_ROW_HEIGHT = 40;
 const GANTT_GROUP_ROW_HEIGHT = 34;
 const GANTT_GROUP_TOP_GAP = 14;
 const GANTT_GROUP_BOTTOM_GAP = 10;
-const GANTT_BAR_HEIGHT = 32;
+const GANTT_BAR_HEIGHT = 12;
 
 const STANDARD_MAPPING = {
   id: "wbs_id",
@@ -1180,16 +1180,16 @@ function GanttChart({
                   onMouseEnter={() => onHover(row.wbsId)}
                   onMouseLeave={() => onHover(null)}
                 >
-                  <div className="min-w-0 pl-4">
-                    <p className="truncate font-semibold text-zinc-800">{row.taskName}</p>
-                    <div className="mt-0.5 flex min-w-0 items-center gap-2">
-                      <p className="shrink-0 font-mono text-[10.5px] text-zinc-400">{row.wbsId}</p>
-                      <span className="min-w-0 truncate rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500">
+                  <div className="flex h-full min-w-0 flex-col justify-center pl-4">
+                    <p className="truncate font-semibold leading-tight text-zinc-800">{row.taskName}</p>
+                    <div className="mt-0.5 flex min-w-0 items-center gap-2 leading-none">
+                      <p className="shrink-0 font-mono text-[10.5px] leading-none text-zinc-400">{row.wbsId}</p>
+                      <span className="min-w-0 truncate rounded-md bg-zinc-100 px-1.5 py-[1px] text-[10.5px] font-medium leading-tight text-zinc-500">
                         {row.owner && row.owner !== "-" ? row.owner : "담당자 미정"}
                       </span>
                     </div>
                   </div>
-                  <div className={cn("relative h-8 rounded-lg bg-zinc-50 transition-colors", highlighted && "bg-[#FD312E]/[0.035]")}>
+                  <div className={cn("relative h-6 rounded-md bg-zinc-50 transition-colors", highlighted && "bg-[#FD312E]/[0.04]")}>
                     <div
                       className={cn("absolute bottom-0 top-0 z-10 w-px", getMilestoneMarkerClass({ label: "TODAY", type: "today" }).line)}
                       style={{ left: `${todayLeft}px` }}
@@ -1215,15 +1215,18 @@ function GanttChart({
                           event.stopPropagation();
                           if (mode === "view") onSelect(row.wbsId);
                         }}
-                        className={cn(
-                          "absolute top-1/2 h-4 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
-                          getGanttBarClass(row, todayTime),
-                          highlighted && "h-5 shadow-md ring-2 ring-[#FD312E]/30",
-                          mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
-                        )}
+                        className={cn("absolute top-1/2 h-6 -translate-y-1/2 rounded-full", mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer")}
                         style={{ left: `${geometry.left}px`, width: `${geometry.width}px` }}
                       >
-                        {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-full bg-[#FD312E]" />}
+                        <span
+                          className={cn(
+                            "pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
+                            getGanttBarClass(row, todayTime),
+                            highlighted && "h-3.5 shadow-md ring-2 ring-[#FD312E]/30"
+                          )}
+                        >
+                          {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-full bg-[#FD312E]" />}
+                        </span>
                         {mode === "edit" && (
                           <>
                             <span
