@@ -6,8 +6,9 @@ export type DependencyTask = {
 
 export type DependencyLayoutItem = {
   left: number;
+  top: number;
   width: number;
-  centerY: number;
+  height: number;
 };
 
 export type DependencyLink = {
@@ -62,8 +63,8 @@ export function getDependencyLinePoints(
 ): DependencyLinePoints {
   const startX = sourceLayout.left + sourceLayout.width;
   const endX = targetLayout.left;
-  const startY = sourceLayout.centerY;
-  const endY = targetLayout.centerY;
+  const startY = sourceLayout.top + sourceLayout.height / 2;
+  const endY = targetLayout.top + targetLayout.height / 2;
   const midX = endX >= startX ? startX + Math.max(18, (endX - startX) / 2) : startX + 18;
   return { startX, startY, midX, endX, endY };
 }

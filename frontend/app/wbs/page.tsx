@@ -93,7 +93,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const GANTT_ROW_HEIGHT = 40;
 const GANTT_GROUP_ROW_HEIGHT = 34;
 const GANTT_GROUP_GAP = 10;
-const GANTT_BAR_CENTER_OFFSET = 16;
+const GANTT_BAR_HEIGHT = 32;
 
 const STANDARD_MAPPING = {
   id: "wbs_id",
@@ -856,7 +856,14 @@ function GanttChart({
         return;
       }
       const geometry = barGeometry(displayRow.task);
-      if (geometry) layouts.set(displayRow.task.wbsId, { ...geometry, centerY: cursorY + GANTT_BAR_CENTER_OFFSET });
+      if (geometry) {
+        layouts.set(displayRow.task.wbsId, {
+          left: geometry.left,
+          top: cursorY + (GANTT_ROW_HEIGHT - GANTT_BAR_HEIGHT) / 2,
+          width: geometry.width,
+          height: GANTT_BAR_HEIGHT
+        });
+      }
       cursorY += GANTT_ROW_HEIGHT;
     });
     return layouts;
@@ -872,13 +879,15 @@ function GanttChart({
   const dependencyLinks = useMemo(
     () =>
       resolveDependencyLinks(
-        visibleRows.map((row) => ({
-          id: row.wbsId,
-          taskName: row.taskName,
-          dependency: row.dependency
-        }))
+        visibleRows
+          .filter((row) => rowLayouts.has(row.wbsId))
+          .map((row) => ({
+            id: row.wbsId,
+            taskName: row.taskName,
+            dependency: row.dependency
+          }))
       ),
-    [visibleRows]
+    [rowLayouts, visibleRows]
   );
 
   function barGeometry(row: WbsRow) {

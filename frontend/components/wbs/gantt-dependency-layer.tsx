@@ -26,7 +26,17 @@ export function GanttDependencyLayer({ links, layouts, width, height, muted }: P
       {links.map((link) => {
         const sourceLayout = layouts.get(link.sourceId);
         const targetLayout = layouts.get(link.targetId);
-        if (!sourceLayout || !targetLayout) return null;
+        if (!sourceLayout || !targetLayout) {
+          if (process.env.NODE_ENV === "development") {
+            console.debug("Skip dependency line: layout not found", {
+              sourceId: link.sourceId,
+              targetId: link.targetId,
+              hasSourceLayout: Boolean(sourceLayout),
+              hasTargetLayout: Boolean(targetLayout)
+            });
+          }
+          return null;
+        }
         const points = getDependencyLinePoints(sourceLayout, targetLayout);
         const path = `M ${points.startX} ${points.startY} C ${points.midX} ${points.startY}, ${points.midX} ${points.endY}, ${points.endX} ${points.endY}`;
         return (
