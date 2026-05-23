@@ -826,6 +826,26 @@ function GanttChart({
   const todayLeft = Math.max(0, Math.min(timelineWidth, ((todayTime - min) / DAY_MS) * pxPerDay));
   const tickEveryDays = zoom === "week" ? 7 : 30;
   const ticks = Array.from({ length: Math.floor(totalDays / tickEveryDays) + 1 }, (_, index) => min + index * tickEveryDays * DAY_MS);
+  const milestoneMarkers = useMemo(() => {
+    const markers = [
+      { id: "today", label: `TODAY (${formatShortDate(todayTime)})`, left: todayLeft, tone: "today" as const },
+      ...validMilestones.map((milestone) => ({
+        id: milestone.id,
+        label: `${milestone.label} (${formatShortDate(toTime(milestone.date)!)})`,
+        left: Math.max(0, Math.min(timelineWidth, ((toTime(milestone.date)! - min) / DAY_MS) * pxPerDay)),
+        tone: "milestone" as const
+      }))
+    ].sort((a, b) => a.left - b.left);
+
+    let previousLeft = -Infinity;
+    let previousLane = 0;
+    return markers.map((marker) => {
+      const lane = marker.left - previousLeft < 118 ? (previousLane + 1) % 2 : 0;
+      previousLeft = marker.left;
+      previousLane = lane;
+      return { ...marker, lane };
+    });
+  }, [min, pxPerDay, timelineWidth, todayLeft, todayTime, validMilestones]);
   const [dragTooltip, setDragTooltip] = useState<{ wbsId: string; text: string; left: number; top: number } | null>(null);
   const rowLayouts = useMemo(() => {
     const layouts = new Map<string, DependencyLayoutItem>();
@@ -1003,30 +1023,30 @@ function GanttChart({
       ) : (
         <>
         <div className="overflow-auto px-4 py-3" style={{ height }}>
-          <div className="mb-2 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
-            <span>Task</span>
-            <div className="relative h-5">
+          <div className="mb-3 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-400" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
+            <span className="pt-1">Task</span>
+            <div className="relative h-14">
               {ticks.map((tick) => (
                 <span key={tick} className="absolute top-0 -translate-x-1/2" style={{ left: `${((tick - min) / DAY_MS) * pxPerDay}px` }}>
                   {formatShortDate(tick)}
                 </span>
               ))}
-              <span className="absolute -top-0.5 -translate-x-1/2 text-[#fd312e]" style={{ left: `${todayLeft}px` }}>
-                Today ({formatShortDate(todayTime)})
-              </span>
-              {validMilestones.map((milestone) => {
-                const left = Math.max(0, Math.min(timelineWidth, ((toTime(milestone.date)! - min) / DAY_MS) * pxPerDay));
-                return (
+              <div className="absolute left-0 top-6 h-8 w-full border-t border-zinc-100">
+                {milestoneMarkers.map((marker) => (
                   <span
-                    key={milestone.id}
-                    className={cn("absolute -top-0.5 max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold text-violet-700", timelineLabelClass(left, timelineWidth))}
-                    style={{ left }}
-                    title={`${milestone.label} (${formatShortDate(toTime(milestone.date)!)})`}
+                    key={marker.id}
+                    className={cn(
+                      "absolute max-w-[132px] truncate rounded bg-white px-1 text-[10px] font-semibold tracking-normal",
+                      marker.tone === "today" ? "text-[#fd312e]" : "text-violet-700",
+                      timelineLabelClass(marker.left, timelineWidth)
+                    )}
+                    style={{ left: marker.left, top: marker.lane * 14 }}
+                    title={marker.label}
                   >
-                    {milestone.label} ({formatShortDate(toTime(milestone.date)!)})
+                    {marker.label}
                   </span>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
           <div className="relative space-y-2">
