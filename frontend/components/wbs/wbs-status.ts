@@ -67,12 +67,12 @@ export function getScheduleState(task: WbsStatusTask, today: string | number | D
 export function getGanttBarClass(task: WbsStatusTask, today: string | number | Date = new Date()) {
   const status = normalizeWbsStatus(task.status);
   const scheduleState = getScheduleState(task, today);
-  if (status === "completed") return "bg-zinc-200 opacity-70";
-  if (status === "cancelled") return "bg-zinc-200 opacity-50";
-  if (scheduleState === "delayed") return "border border-red-300/80 bg-red-200/60 ring-1 ring-red-200/70";
-  if (status === "hold") return "border border-amber-300/90 bg-amber-100";
-  if (status === "progress") return "bg-red-200/80";
-  if (status === "planned") return "border border-amber-300/60 bg-amber-200/60";
+  if (status === "completed") return "bg-[#E5E5E5] opacity-70";
+  if (status === "cancelled") return "bg-[#E5E5E5] opacity-55";
+  if (scheduleState === "delayed") return "border border-[#F29A96] bg-[#F29A96]/85 ring-1 ring-[#F29A96]/40";
+  if (status === "hold") return "bg-[#E5E5E5] opacity-70";
+  if (status === "progress") return "bg-[#F8B4B2]/90";
+  if (status === "planned") return "border border-[#F6DFA8] bg-[#F6DFA8]/90";
   return "bg-zinc-300/90";
 }
 
