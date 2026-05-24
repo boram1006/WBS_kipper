@@ -309,6 +309,7 @@ export default function CurrentWbsPage() {
   const [savedRows, setSavedRows] = useState<WbsRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [ganttHoveredId, setGanttHoveredId] = useState<string | null>(null);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<ViewMode>("view");
   const [loading, setLoading] = useState(true);
@@ -607,14 +608,14 @@ export default function CurrentWbsPage() {
                   showCompleted={showCompletedInGantt}
                   mode={mode}
                   zoom={ganttZoom}
-                  hoveredId={hoveredId}
+                  hoveredId={ganttHoveredId ?? hoveredId}
                   activeId={activeId}
                   unsavedCount={unsavedCount}
                   saving={saving}
                   onHeightChange={setGanttHeight}
                   onShowCompletedChange={setShowCompletedInGantt}
                   onZoomChange={setGanttZoom}
-                  onHover={setHoveredId}
+                  onHover={setGanttHoveredId}
                   onSelect={setActiveId}
                   onRowDatesChange={updateRowDates}
                   onEnterEditMode={enterEditMode}
@@ -891,6 +892,7 @@ function GanttChart({
   const todayLeft = Math.max(0, Math.min(timelineWidth, ((todayTime - min) / DAY_MS) * pxPerDay));
   const tickEveryDays = zoom === "week" ? 7 : zoom === "fit" ? (totalDays > 90 ? 30 : 7) : 30;
   const ticks = Array.from({ length: Math.floor(totalDays / tickEveryDays) + 1 }, (_, index) => min + index * tickEveryDays * DAY_MS);
+  const weeklyGridTicks = Array.from({ length: Math.floor(totalDays / 7) + 1 }, (_, index) => min + index * 7 * DAY_MS);
   const milestoneMarkers = useMemo(() => {
     const markers = [
       { id: "today", label: "TODAY", dateLabel: formatShortDate(todayTime), left: todayLeft, type: "today" as const },
@@ -1215,7 +1217,7 @@ function GanttChart({
                     </div>
                   </div>
                   <div className="relative h-full transition-colors">
-                    {ticks.map((tick) => {
+                    {weeklyGridTicks.map((tick) => {
                       const tickLeft = ((tick - min) / DAY_MS) * pxPerDay;
                       return (
                         <span
