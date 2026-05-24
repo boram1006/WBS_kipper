@@ -1054,46 +1054,46 @@ function GanttChart({
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="space-y-3 border-b border-zinc-100 px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-2 border-b border-zinc-100 px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <Calendar className="h-3.5 w-3.5 text-zinc-500" />
             일정 타임라인
           </h2>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {mode === "view" ? (
-              <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onEnterEditMode}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              <Button variant="outline" className="h-7 rounded-lg border-zinc-200 bg-white px-2.5 text-[11.5px] shadow-sm" onClick={onEnterEditMode}>
+                <Pencil className="mr-1.5 h-3 w-3" />
                 간트 일정 수정
               </Button>
             ) : (
               <>
-                <span className="inline-flex h-8 items-center rounded-lg border border-[#FD312E]/25 bg-[#FD312E]/5 px-3 text-xs font-semibold text-[#FD312E]">
+                <span className="inline-flex h-7 items-center rounded-lg border border-[#FD312E]/25 bg-[#FD312E]/5 px-2.5 text-[11.5px] font-semibold text-[#FD312E]">
                   {unsavedCount} unsaved
                 </span>
-                <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onReset} disabled={saving || unsavedCount === 0}>
-                  <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                <Button variant="outline" className="h-7 rounded-lg border-zinc-200 bg-white px-2.5 text-[11.5px] shadow-sm" onClick={onReset} disabled={saving || unsavedCount === 0}>
+                  <RotateCcw className="mr-1.5 h-3 w-3" />
                   Reset
                 </Button>
-                <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onCancel} disabled={saving}>
-                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                <Button variant="outline" className="h-7 rounded-lg border-zinc-200 bg-white px-2.5 text-[11.5px] shadow-sm" onClick={onCancel} disabled={saving}>
+                  <Eye className="mr-1.5 h-3 w-3" />
                   Cancel
                 </Button>
-                <Button className="h-8 rounded-lg bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800" onClick={onSave} disabled={saving || unsavedCount === 0}>
-                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                <Button className="h-7 rounded-lg bg-zinc-950 px-2.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800" onClick={onSave} disabled={saving || unsavedCount === 0}>
+                  <Save className="mr-1.5 h-3 w-3" />
                   {saving ? "Saving..." : "Save changes"}
                 </Button>
               </>
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-zinc-500">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] leading-none text-zinc-400">
             {mode === "edit" ? "드래그해서 일정을 조정할 수 있습니다." : "빨간 기준선은 오늘 날짜입니다."}
           </p>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="flex items-center gap-2">
-              <div className="inline-flex h-8 rounded-lg border border-zinc-200 bg-white p-0.5">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex items-center gap-1.5">
+              <div className="inline-flex h-7 rounded-lg border border-zinc-200 bg-white p-0.5">
                 {[
                   { value: "fit" as const, label: "전체", title: "전체 일정이 한 화면에 보이도록 맞춤" },
                   { value: "month" as const, label: "월", title: "월 단위로 보기" },
@@ -1105,7 +1105,7 @@ function GanttChart({
                     onClick={() => onZoomChange(item.value)}
                     title={item.title}
                     className={cn(
-                      "rounded-md px-2.5 text-[11.5px] font-semibold transition-colors",
+                      "rounded-md px-2 text-[11px] font-semibold transition-colors",
                       zoom === item.value ? "bg-zinc-950 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-900"
                     )}
                   >
@@ -1114,8 +1114,8 @@ function GanttChart({
                 ))}
               </div>
             </div>
-            <div className="h-5 w-px bg-zinc-200/70" />
-            <div className="flex h-8 items-center gap-2 text-[11.5px] font-medium text-zinc-700">
+            <div className="h-4 w-px bg-zinc-200/70" />
+            <div className="flex h-7 items-center gap-1.5 text-[11px] font-medium text-zinc-700">
               <span>완료 숨김</span>
               <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
             </div>
@@ -1126,10 +1126,10 @@ function GanttChart({
         <div className="px-6 py-10 text-center text-sm text-zinc-500">표시할 일정이 없습니다. 완료 숨김을 끄면 완료된 일정도 다시 표시됩니다.</div>
       ) : (
         <>
-        <div ref={scrollRef} className={cn("px-4 py-3", zoom === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto")} style={{ height }}>
-          <div className="mb-2 grid gap-3 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-zinc-500" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
-            <span className="pt-1">Task</span>
-            <div className="relative h-9">
+        <div ref={scrollRef} className={cn("px-4 py-2", zoom === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto")} style={{ height }}>
+          <div className="mb-1 grid gap-3 text-[10px] font-semibold uppercase tracking-[0.035em] text-zinc-500" style={{ gridTemplateColumns: `220px ${timelineWidth}px` }}>
+            <span className="pt-0.5">Task</span>
+            <div className="relative h-7">
               {ticks.map((tick) => (
                 <span
                   key={tick}
@@ -1139,13 +1139,13 @@ function GanttChart({
                   {formatShortDate(tick)}
                 </span>
               ))}
-              <div className="absolute left-0 top-5 h-4 w-full">
+              <div className="absolute left-0 top-4 h-3.5 w-full">
                 {milestoneMarkers.map((marker) => (
                   <div
                     key={marker.id}
                     className={cn(
-                      "absolute flex max-w-[132px] items-center gap-1.5 whitespace-nowrap rounded-full bg-white/95 text-[10px] font-semibold tracking-normal",
-                      marker.variant === "today" ? "px-1" : "border px-2 py-0.5",
+                      "absolute flex max-w-[124px] items-center gap-1 whitespace-nowrap rounded-full bg-white/95 text-[9.5px] font-semibold tracking-normal",
+                      marker.variant === "today" ? "px-0.5" : "border px-1.5 py-[1px]",
                       getMilestoneMarkerClass(marker).label,
                       timelineLabelClass(marker.left, timelineWidth)
                     )}
