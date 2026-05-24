@@ -1197,7 +1197,10 @@ function GanttChart({
               return (
                 <div
                   key={row.wbsId}
-                  className={cn("grid items-center gap-3 rounded-lg text-[12px] transition-colors", highlighted && "bg-red-50/50")}
+                  className={cn(
+                    "grid items-center gap-3 border-b border-zinc-100/80 text-[12px] transition-colors",
+                    highlighted && "bg-[#FD312E]/[0.04]"
+                  )}
                   style={{ gridTemplateColumns: `220px ${timelineWidth}px`, minHeight: GANTT_ROW_HEIGHT }}
                   onMouseEnter={() => onHover(row.wbsId)}
                   onMouseLeave={() => onHover(null)}
@@ -1211,7 +1214,17 @@ function GanttChart({
                       </span>
                     </div>
                   </div>
-                  <div className={cn("relative h-7 rounded-md bg-zinc-50/70 transition-colors", highlighted && "bg-red-50/40")}>
+                  <div className="relative h-full transition-colors">
+                    {ticks.map((tick) => {
+                      const tickLeft = ((tick - min) / DAY_MS) * pxPerDay;
+                      return (
+                        <span
+                          key={`grid-${row.wbsId}-${tick}`}
+                          className="pointer-events-none absolute inset-y-1 z-0 border-l border-zinc-100"
+                          style={{ left: `${tickLeft}px` }}
+                        />
+                      );
+                    })}
                     <div
                       className={cn("absolute bottom-0 top-0 z-10 w-px", getMilestoneMarkerClass({ label: "TODAY", type: "today" }).line)}
                       style={{ left: `${todayLeft}px` }}
@@ -1236,14 +1249,14 @@ function GanttChart({
                         onClick={(event) => {
                           event.stopPropagation();
                         }}
-                        className={cn("absolute top-1/2 h-6 -translate-y-1/2 rounded-full", mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer")}
+                        className={cn("absolute top-1/2 z-20 h-6 -translate-y-1/2 rounded-full", mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer")}
                         style={{ left: `${geometry.left}px`, width: `${geometry.width}px` }}
                       >
                         <span
                           className={cn(
                             "pointer-events-none absolute inset-x-0 top-1/2 h-3.5 -translate-y-1/2 rounded-full border border-white/70 shadow-sm transition-[height,box-shadow]",
                             getGanttBarClass(row, todayTime),
-                            highlighted && "h-4 shadow-md ring-2 ring-red-200"
+                            highlighted && "h-4 shadow-md ring-2 ring-[#FD312E]/30"
                           )}
                         >
                           {getScheduleState(row, todayTime) === "delayed" && <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-full bg-[#FD312E]/80" />}
