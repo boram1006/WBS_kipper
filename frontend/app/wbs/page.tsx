@@ -1234,7 +1234,6 @@ function GanttChart({
                         onPointerDown={(event) => startGanttDrag(event, row, "move")}
                         onClick={(event) => {
                           event.stopPropagation();
-                          if (mode === "view") onSelect(row.wbsId);
                         }}
                         className={cn("absolute top-1/2 h-6 -translate-y-1/2 rounded-full", mode === "edit" ? "cursor-grab active:cursor-grabbing" : "cursor-pointer")}
                         style={{ left: `${geometry.left}px`, width: `${geometry.width}px` }}
