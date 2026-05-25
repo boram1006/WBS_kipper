@@ -417,11 +417,6 @@ export default function CurrentWbsPage() {
     return new Set(rows.filter((row) => savedFingerprintByWbsId.get(row.wbsId) !== rowFingerprint(row)).map((row) => row.wbsId));
   }, [rows, savedFingerprintByWbsId]);
   const unsavedCount = modifiedIds.size;
-  const latestUpdatedLabel = useMemo(() => {
-    const values = rows.map((row) => row.lastUpdated).filter((value) => value && value !== "-");
-    return values[0] ?? "Not available";
-  }, [rows]);
-
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return rows.filter((row) => {
@@ -561,9 +556,6 @@ export default function CurrentWbsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ProjectSelector projectId={projectId} onChange={setProjectId} allowCreate={false} preferDefaultProject />
-              <span className="inline-flex h-8 items-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-500">
-                Last updated: <span className="ml-1 text-zinc-700">{latestUpdatedLabel}</span>
-              </span>
               <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={downloadCsv} disabled={!projectId}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download CSV
@@ -1056,14 +1048,20 @@ function GanttChart({
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="space-y-2 border-b border-zinc-100 px-4 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
-            <Calendar className="h-3.5 w-3.5 text-zinc-500" />
-            일정 타임라인
-          </h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+              <Calendar className="h-3.5 w-3.5 text-zinc-500" />
+              일정 타임라인
+            </h2>
+            <div className="flex h-7 items-center gap-1.5 text-[11px] font-medium text-zinc-700">
+              <span>완료 숨김</span>
+              <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
+            </div>
+          </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {mode === "view" ? (
-              <Button variant="outline" className="h-7 rounded-lg border-zinc-200 bg-white px-2.5 text-[11.5px] shadow-sm" onClick={onEnterEditMode}>
-                <Pencil className="mr-1.5 h-3 w-3" />
+              <Button variant="outline" className="h-7 rounded-lg border-zinc-200 bg-white px-2 text-[10.5px] font-medium shadow-sm" onClick={onEnterEditMode}>
+                <Pencil className="mr-1 h-2.5 w-2.5" />
                 간트 일정 수정
               </Button>
             ) : (
@@ -1113,11 +1111,6 @@ function GanttChart({
                   </button>
                 ))}
               </div>
-            </div>
-            <div className="h-4 w-px bg-zinc-200/70" />
-            <div className="flex h-7 items-center gap-1.5 text-[11px] font-medium text-zinc-700">
-              <span>완료 숨김</span>
-              <MiniSwitch checked={!showCompleted} onCheckedChange={(checked) => onShowCompletedChange(!checked)} />
             </div>
           </div>
         </div>
