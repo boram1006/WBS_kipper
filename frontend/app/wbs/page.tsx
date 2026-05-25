@@ -322,7 +322,7 @@ export default function CurrentWbsPage() {
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [changeTypeFilter, setChangeTypeFilter] = useState<(typeof changeTypeOptions)[number]["value"]>("all");
   const [showCompletedInGantt, setShowCompletedInGantt] = useState(true);
-  const [ganttHeight, setGanttHeight] = useState(320);
+  const [ganttHeight, setGanttHeight] = useState(420);
   const [ganttZoom, setGanttZoom] = useState<GanttZoom>("fit");
   const [milestones, setMilestones] = useState<WbsMilestone[]>([]);
   const [groups, setGroups] = useState<ReturnType<typeof loadWbsGroups>>([]);
@@ -1060,7 +1060,7 @@ function GanttChart({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {mode === "view" ? (
-              <Button variant="outline" className="h-7 rounded-lg border-zinc-200 bg-white px-2 text-[10.5px] font-medium shadow-sm" onClick={onEnterEditMode}>
+              <Button variant="outline" className="h-7 rounded-lg border-zinc-200 bg-white px-2 text-[9.5px] font-medium shadow-sm" onClick={onEnterEditMode}>
                 <Pencil className="mr-1 h-2.5 w-2.5" />
                 간트 일정 수정
               </Button>
