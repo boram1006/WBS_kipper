@@ -865,24 +865,24 @@ function MilestoneSettings({
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
             <CalendarDays className="h-3.5 w-3.5 text-zinc-500" />
-            ????
+            마일스톤
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">Gantt ??? Today ??? ??? ?? ??? ?????.</p>
+          <p className="mt-1 text-xs text-zinc-500">Gantt 차트에 Today 선처럼 표시할 주요 날짜를 입력합니다.</p>
         </div>
         <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs shadow-sm" onClick={onAdd}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
-          ???? ??
+          마일스톤 추가
         </Button>
       </div>
       {milestones.length === 0 ? (
         <div className="flex flex-col items-start gap-3 px-4 py-5 text-[12.5px] text-zinc-500">
           <div>
-            <p className="font-medium text-zinc-700">??? ????? ????.</p>
-            <p className="mt-1">Gantt? ??? ???? ?????.</p>
+            <p className="font-medium text-zinc-700">등록된 마일스톤이 없습니다.</p>
+            <p className="mt-1">Gantt에 표시할 기준일을 추가하세요.</p>
           </div>
           <Button variant="outline" className="h-8 rounded-lg border-zinc-200 bg-white px-3 text-xs" onClick={onAdd}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
-            ???? ??
+            마일스톤 추가
           </Button>
         </div>
       ) : (
@@ -892,7 +892,7 @@ function MilestoneSettings({
               <Input
                 value={milestone.label}
                 onChange={(event) => onUpdate(milestone.id, "label", event.target.value)}
-                placeholder="?: MVP ??"
+                placeholder="예: MVP 완료"
                 className="h-8 min-w-0 rounded-md border-zinc-200 bg-white px-2 text-[12px] shadow-none"
               />
               <Input
@@ -905,7 +905,7 @@ function MilestoneSettings({
                 type="button"
                 onClick={() => onDelete(milestone.id)}
                 className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700"
-                aria-label="???? ??"
+                aria-label="마일스톤 삭제"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -1038,7 +1038,7 @@ function EditableWbsTable({
                           <div className="flex items-center gap-1.5">
                             <Button type="button" variant="outline" className="h-7 rounded-md border-zinc-200 bg-white px-2 text-[11px]" onClick={() => onAddTaskToGroup(displayRow.groupKey)}>
                               <Plus className="mr-1 h-3 w-3" />
-                              ?? ??
+                              작업 추가
                             </Button>
                             <button
                               type="button"
