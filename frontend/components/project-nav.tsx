@@ -9,8 +9,7 @@ type NavItem = {
 const items: NavItem[] = [
   { label: "WBS 현황", href: routes.wbs },
   { label: "WBS 설정", href: routes.upload },
-  { label: "회의록 분석", href: routes.meetingNote },
-  { label: "변경 이력", href: routes.history }
+  { label: "회의록 분석", href: routes.meetingNote }
 ];
 
 export function ProjectNav({ projectId }: { projectId: string }) {

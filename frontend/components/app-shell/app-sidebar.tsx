@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronsUpDown, FileText, GitBranch, History, PanelLeftClose, PanelLeftOpen, Table2 } from "lucide-react";
+import { ChevronsUpDown, FileText, GitBranch, PanelLeftClose, PanelLeftOpen, Table2 } from "lucide-react";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +72,6 @@ export function AppSidebar({ projectId }: Props) {
             <div className="space-y-0.5">
               <NavItem href={routes.wbs(projectId)} icon={Table2} label="WBS 현황" active={pathname === "/wbs"} collapsed={collapsed} />
               <NavItem href={routes.meetingNote(projectId)} icon={FileText} label="회의록 분석" active={pathname === "/meeting-note"} collapsed={collapsed} />
-              <NavItem href={routes.history(projectId)} icon={History} label="변경 이력" active={pathname === "/history"} collapsed={collapsed} />
             </div>
           </div>
 
