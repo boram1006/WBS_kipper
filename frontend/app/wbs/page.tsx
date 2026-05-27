@@ -355,19 +355,7 @@ export default function CurrentWbsPage() {
     async function load() {
       const cached = loadWbsSnapshot(projectId);
       const assignments = loadWbsGroupAssignments(projectId);
-      if (cached?.rows_preview?.length) {
-        const cachedRows = normalizeRawRows(cached.rows_preview, cached.mapping, assignments);
-        setRows(cachedRows);
-        setSavedRows(cachedRows);
-        setActiveId(null);
-        setMode("view");
-        setDataSource("cache");
-        setError(null);
-        setMessage(null);
-        setLoading(false);
-      } else {
-        setLoading(true);
-      }
+      setLoading(true);
       setError(null);
       try {
         if (!projectId) throw new Error("프로젝트 ID가 없습니다.");

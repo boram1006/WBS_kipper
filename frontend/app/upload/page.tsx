@@ -319,13 +319,7 @@ export default function WbsSetupPage() {
         return;
       }
       const cached = loadWbsSnapshot(projectId);
-      if (cached?.rows_preview?.length) {
-        showSavedSnapshot(cached);
-        setMessage(null);
-        setLoadingExisting(false);
-      } else {
-        setLoadingExisting(true);
-      }
+      setLoadingExisting(true);
       try {
         const snapshot = await api.getWbs(projectId);
         if (!alive) return;
@@ -343,6 +337,7 @@ export default function WbsSetupPage() {
       } catch {
         if (!alive) return;
         if (cached?.rows_preview?.length) {
+          showSavedSnapshot(cached);
           setMessage("서버 WBS를 바로 불러오지 못해 브라우저에 저장된 WBS를 표시했습니다.");
         } else {
           setRows([]);
