@@ -46,7 +46,7 @@ export function ReviewPageHeader({
           <nav className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
             <Link href="/" className="hover:text-zinc-700">WBS Keeper</Link>
             <span>/</span>
-            <Link href={routes.project(projectId)} className="hover:text-zinc-700">{projectName}</Link>
+            <Link href={routes.wbs(projectId)} className="hover:text-zinc-700">{projectName}</Link>
             <span>/</span>
             <span className="text-zinc-700">업데이트 검토</span>
           </nav>

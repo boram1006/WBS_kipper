@@ -33,6 +33,7 @@ import {
   getGroupKey,
   getNextWbsIdForGroup,
   groupWbsTasks,
+  groupsFromRawRows,
   inferGroupsFromTasks,
   isGroupRow,
   renameGroup,
@@ -159,17 +160,26 @@ function escapeCsv(value: string) {
   return `"${value.replaceAll('"', '""')}"`;
 }
 
-function rowsToCsv(rows: WbsEditableRow[]) {
-  const body = rows.map((row) => STANDARD_COLUMN_KEYS.map((key) => escapeCsv(String(row[key] ?? ""))).join(","));
-  return [STANDARD_COLUMN_KEYS.join(","), ...body].join("\r\n");
+function rowsToCsv(rows: WbsEditableRow[], groupLabelByKey: Map<string, string> = new Map()) {
+  const extraHeaders = ["group_key", "group_label"];
+  const body = rows.map((row) => {
+    const groupKey = row.groupKey ?? "";
+    const groupLabel = groupKey ? (groupLabelByKey.get(groupKey) ?? groupKey) : "";
+    return [
+      ...STANDARD_COLUMN_KEYS.map((key) => escapeCsv(String(row[key] ?? ""))),
+      escapeCsv(groupKey),
+      escapeCsv(groupLabel)
+    ].join(",");
+  });
+  return [[...STANDARD_COLUMN_KEYS, ...extraHeaders].join(","), ...body].join("\r\n");
 }
 
 function buildTemplateCsv() {
   return [STANDARD_COLUMN_KEYS.join(","), ...SAMPLE_ROWS.map((row) => row.map(escapeCsv).join(","))].join("\r\n");
 }
 
-function csvFileFromRows(rows: WbsEditableRow[]) {
-  return new File([`\uFEFF${rowsToCsv(rows)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
+function csvFileFromRows(rows: WbsEditableRow[], groupLabelByKey?: Map<string, string>) {
+  return new File([`\uFEFF${rowsToCsv(rows, groupLabelByKey)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
 }
 
 async function uploadAndMapStandardWbs(projectId: string, file: File) {
@@ -225,7 +235,9 @@ function normalizeUploadedRows(text: string) {
 function editableRowsFromRaw(rawRows: Record<string, string>[], assignments: WbsGroupAssignment[] = []) {
   return rawRows.map((raw) => {
     const values = STANDARD_COLUMN_KEYS.map((key) => String(raw[key] ?? ""));
-    return rowFromValues(values, groupKeyFromAssignment(values[0] ?? "", values[1] ?? "", assignments));
+    const rawGroupKey = (raw.group_key ?? "").trim();
+    const groupKey = rawGroupKey || groupKeyFromAssignment(values[0] ?? "", values[1] ?? "", assignments);
+    return rowFromValues(values, groupKey);
   });
 }
 
@@ -305,8 +317,11 @@ export default function WbsSetupPage() {
       const savedGroups = projectId ? loadWbsGroups(projectId) : [];
       const assignments = projectId ? loadWbsGroupAssignments(projectId) : [];
       const nextRows = editableRowsFromRaw(snapshot.rows_preview, assignments);
+      const serverGroups = groupsFromRawRows(snapshot.rows_preview);
+      const resolvedGroups = serverGroups.length > 0 ? serverGroups : inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), savedGroups);
       setRows(nextRows);
-      setGroups(inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), savedGroups));
+      setGroups(resolvedGroups);
+      if (serverGroups.length > 0 && projectId) saveWbsGroups(projectId, serverGroups);
       setUploadedColumns([...STANDARD_COLUMN_KEYS]);
       setFileName("Saved WBS");
       setIsCreatingNewWbs(false);
@@ -543,7 +558,8 @@ export default function WbsSetupPage() {
     try {
       let targetProjectId = projectId;
       let snapshot;
-      const file = csvFileFromRows(rows);
+      const groupLabelByKey = new Map(groups.map((g) => [g.groupKey, g.label]));
+      const file = csvFileFromRows(rows, groupLabelByKey);
       if (isCreatingNewWbs) {
         const project = await api.createProject({
           name: newWbsName.trim(),

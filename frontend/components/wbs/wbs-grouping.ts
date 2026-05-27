@@ -140,3 +140,17 @@ export function moveTaskToGroup<TTask extends WbsGroupingTask & { clientId?: str
 export function createTaskInGroup<TTask extends WbsGroupingTask>(tasks: TTask[], groupKey: string, createTask: (wbsId: string) => TTask) {
   return createTask(getNextWbsIdForGroup(tasks, groupKey));
 }
+
+export function groupsFromRawRows(rows: Array<Record<string, string>>): WbsGroup[] {
+  const seen = new Map<string, string>();
+  const order: string[] = [];
+  for (const row of rows) {
+    const groupKey = (row.group_key ?? "").trim();
+    if (!groupKey) continue;
+    if (!seen.has(groupKey)) {
+      order.push(groupKey);
+      seen.set(groupKey, (row.group_label ?? "").trim() || groupKey);
+    }
+  }
+  return order.map((groupKey, index) => ({ groupKey, label: seen.get(groupKey)!, order: index }));
+}

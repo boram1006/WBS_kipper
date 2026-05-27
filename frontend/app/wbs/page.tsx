@@ -31,7 +31,7 @@ import { Input } from "@/components/ui/input";
 import { GanttDependencyLayer } from "@/components/wbs/gantt-dependency-layer";
 import { resolveDependencyLinks, type DependencyLayoutItem } from "@/components/wbs/gantt-dependencies";
 import { getMilestoneMarkerClass, getMilestonePosition, resolveMilestoneLabelVisibility } from "@/components/wbs/gantt-milestones";
-import { flattenVisibleRows, groupWbsTasks, isGroupRow, isTaskRow, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
+import { flattenVisibleRows, groupWbsTasks, groupsFromRawRows, isGroupRow, isTaskRow, type WbsDisplayRow } from "@/components/wbs/wbs-grouping";
 import {
   getGanttBarClass,
   getScheduleBadge,
@@ -51,6 +51,7 @@ import {
   loadWbsMilestones,
   loadWbsSnapshot,
   saveWbsGroupAssignments,
+  saveWbsGroups,
   saveWbsSnapshot,
   type CachedWbsSnapshot,
   type WbsGroupAssignment,
@@ -122,9 +123,12 @@ function escapeCsv(value: string) {
   return `"${value.replaceAll('"', '""')}"`;
 }
 
-function rowsToCsv(rows: WbsRow[]) {
-  const body = rows.map((row) =>
-    [
+function rowsToCsv(rows: WbsRow[], groupLabelByKey: Map<string, string> = new Map()) {
+  const headers = [...STANDARD_COLUMNS, "group_key", "group_label"];
+  const body = rows.map((row) => {
+    const groupKey = row.groupKey ?? "";
+    const groupLabel = groupKey ? (groupLabelByKey.get(groupKey) ?? groupKey) : "";
+    return [
       row.wbsId,
       row.taskName,
       row.description,
@@ -133,20 +137,22 @@ function rowsToCsv(rows: WbsRow[]) {
       normalizeDateValue(row.dueDate),
       row.status,
       row.dependency === "-" ? "" : row.dependency,
-      row.notes
+      row.notes,
+      groupKey,
+      groupLabel
     ]
       .map((value) => escapeCsv(String(value ?? "")))
-      .join(",")
-  );
-  return [STANDARD_COLUMNS.join(","), ...body].join("\r\n");
+      .join(",");
+  });
+  return [headers.join(","), ...body].join("\r\n");
 }
 
-function csvFileFromRows(rows: WbsRow[]) {
-  return new File([`\uFEFF${rowsToCsv(rows)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
+function csvFileFromRows(rows: WbsRow[], groupLabelByKey?: Map<string, string>) {
+  return new File([`\uFEFF${rowsToCsv(rows, groupLabelByKey)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
 }
 
-async function uploadAndMapStandardWbs(projectId: string, rows: WbsRow[]) {
-  const snapshot = await api.uploadWbs(projectId, csvFileFromRows(rows));
+async function uploadAndMapStandardWbs(projectId: string, rows: WbsRow[], groupLabelByKey?: Map<string, string>) {
+  const snapshot = await api.uploadWbs(projectId, csvFileFromRows(rows, groupLabelByKey));
   await api.mapWbsColumns(projectId, STANDARD_MAPPING);
   return snapshot;
 }
@@ -237,9 +243,10 @@ function normalizeRawRows(rows: Record<string, string>[], mapping: CachedWbsSnap
   return rows.map((raw, index) => {
     const wbsId = mappedValue(raw, mapping?.id, ["wbs_id", "wbs id", "wbs코드", "id", "_row_id"], `${index + 1}`);
     const taskName = mappedValue(raw, mapping?.task_name, ["task_name", "task name", "작업명", "task", "name"], `Task ${index + 1}`);
+    const rawGroupKey = (raw.group_key ?? "").trim();
     return {
       wbsId,
-      groupKey: groupKeyFromAssignment(wbsId, taskName, assignments),
+      groupKey: rawGroupKey || groupKeyFromAssignment(wbsId, taskName, assignments),
       taskName,
       description: mappedValue(raw, mapping?.description, ["description", "설명"], ""),
       owner: mappedValue(raw, mapping?.owner, ["owner", "담당자", "assignee"], "미정"),
@@ -361,6 +368,7 @@ export default function CurrentWbsPage() {
         if (!projectId) throw new Error("프로젝트 ID가 없습니다.");
         const snapshot = await api.getWbs(projectId);
         const parsed = normalizeRawRows(snapshot.rows_preview, {}, assignments);
+        const serverGroups = groupsFromRawRows(snapshot.rows_preview);
         if (!alive) return;
         setRows(parsed);
         setSavedRows(parsed);
@@ -368,6 +376,10 @@ export default function CurrentWbsPage() {
         setMode("view");
         setDataSource("api");
         setMessage(null);
+        if (serverGroups.length > 0) {
+          setGroups(serverGroups);
+          saveWbsGroups(projectId, serverGroups);
+        }
         saveWbsSnapshot(projectId, snapshot);
       } catch (err) {
         if (!alive) return;
@@ -503,7 +515,8 @@ export default function CurrentWbsPage() {
     setError(null);
     setMessage(null);
     try {
-      const snapshot = await uploadAndMapStandardWbs(projectId, rows);
+      const groupLabelByKey = new Map(groups.map((g) => [g.groupKey, g.label]));
+      const snapshot = await uploadAndMapStandardWbs(projectId, rows, groupLabelByKey);
       saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
       const assignments = rows.map((row) => ({ wbsId: row.wbsId, taskName: row.taskName, groupKey: row.groupKey || "" })).filter((assignment) => assignment.groupKey);
       saveWbsGroupAssignments(projectId, assignments);
