@@ -383,18 +383,22 @@ def _insert_wbs_row(conn, project_id: int, row: dict[str, str], raw: dict[str, s
 
 
 def _get_wbs_rows(conn, project_id: int) -> list[dict[str, str]]:
-    return [
-        dict(row)
-        for row in conn.execute(
-            """
-            SELECT wbs_id, task_name, description, owner, start_date, due_date, status, dependency, notes
-            FROM wbs_rows
-            WHERE project_id = ?
-            ORDER BY id
-            """,
-            (project_id,),
-        ).fetchall()
-    ]
+    rows = []
+    for row in conn.execute(
+        """
+        SELECT wbs_id, task_name, description, owner, start_date, due_date, status, dependency, notes, raw_json
+        FROM wbs_rows
+        WHERE project_id = ?
+        ORDER BY id
+        """,
+        (project_id,),
+    ).fetchall():
+        d = dict(row)
+        raw = loads(d.pop("raw_json") or "{}")
+        d["group_key"] = raw.get("group_key", "")
+        d["group_label"] = raw.get("group_label", "")
+        rows.append(d)
+    return rows
 
 
 def _normalize_wbs_row(raw: dict[str, str], mapping: dict[str, str] | None = None, index: int = 1) -> dict[str, str]:
