@@ -521,8 +521,10 @@ def _value(raw: dict[str, str], mapped_column: str | None, fallbacks: list[str])
     if mapped_column and mapped_column in raw:
         return str(raw.get(mapped_column, "")).strip()
     for key in fallbacks:
+        norm_key = key.lower().replace("_", " ")
         for column, value in raw.items():
-            if key == column.lower() or key in column.lower():
+            norm_col = column.lower().replace("_", " ")
+            if norm_key == norm_col or norm_key in norm_col:
                 text = str(value).strip()
                 if text:
                     return text
