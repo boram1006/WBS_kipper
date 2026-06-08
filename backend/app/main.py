@@ -61,6 +61,23 @@ def startup() -> None:
     init_db()
     with get_conn() as conn:
         _ensure_default_project(conn)
+        _fix_integer_wbs_ids(conn)
+
+
+def _fix_integer_wbs_ids(conn) -> None:
+    """Re-extract wbs_id from raw_json for rows where it was incorrectly set to a plain integer."""
+    rows = conn.execute("SELECT id, wbs_id, raw_json FROM wbs_rows").fetchall()
+    for row in rows:
+        current_id = str(row["wbs_id"]).strip()
+        if not current_id.lstrip("-").isdigit():
+            continue  # already a real ID, skip
+        raw = loads(row["raw_json"]) or {}
+        fixed_id = _value(raw, None, ["task id", "wbs id", "id", "_row_id"])
+        if fixed_id and not fixed_id.lstrip("-").isdigit():
+            conn.execute(
+                "UPDATE wbs_rows SET wbs_id = ? WHERE id = ?",
+                (fixed_id, row["id"]),
+            )
 
 
 @app.get("/health")
