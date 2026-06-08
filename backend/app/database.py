@@ -232,8 +232,21 @@ def _to_postgres_sql(sql: str, returning_id: bool = False) -> str:
 
 
 def _should_return_id(sql: str) -> bool:
+    import re
     normalized = " ".join(sql.strip().split()).lower()
-    return normalized.startswith("insert into ") and " returning " not in normalized
+    if not normalized.startswith("insert into ") or " returning " in normalized:
+        return False
+    # If id is explicitly in the column list, it's not auto-generated
+    col_match = re.search(r"insert into \S+ \(([^)]+)\)", normalized)
+    if col_match:
+        cols = {c.strip() for c in col_match.group(1).split(",")}
+        if "id" in cols:
+            return False
+        # Tables with composite PK and no auto-increment id column
+        table_match = re.search(r"insert into (\w+)", normalized)
+        if table_match and table_match.group(1) in ("wbs_milestones", "wbs_groups"):
+            return False
+    return True
 
 
 def _split_sql_script(sql: str) -> list[str]:
