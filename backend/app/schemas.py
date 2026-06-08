@@ -161,3 +161,26 @@ class ChangeHistoryItem(BaseModel):
 
 class ChangeHistoryResponse(BaseModel):
     history: list[ChangeHistoryItem]
+
+
+class WbsMilestoneItem(BaseModel):
+    id: str
+    label: str
+    date: str
+    order: int = 0
+
+
+class WbsGroupItem(BaseModel):
+    group_key: str
+    label: str
+    order: int = 0
+
+
+class WbsMetaResponse(BaseModel):
+    milestones: list[WbsMilestoneItem]
+    groups: list[WbsGroupItem]
+
+
+class WbsMetaSaveRequest(BaseModel):
+    milestones: list[WbsMilestoneItem]
+    groups: list[WbsGroupItem]

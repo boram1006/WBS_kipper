@@ -341,8 +341,20 @@ export default function CurrentWbsPage() {
   }, []);
 
   useEffect(() => {
-    setMilestones(projectId ? loadWbsMilestones(projectId) : []);
-    setGroups(projectId ? loadWbsGroups(projectId) : []);
+    if (!projectId) {
+      setMilestones([]);
+      setGroups([]);
+      return;
+    }
+    api.getWbsMeta(projectId)
+      .then((meta) => {
+        setMilestones(meta.milestones.map((m) => ({ id: m.id, label: m.label, date: m.date })));
+        setGroups(meta.groups.map((g) => ({ groupKey: g.group_key, label: g.label, order: g.order })));
+      })
+      .catch(() => {
+        setMilestones(loadWbsMilestones(projectId));
+        setGroups(loadWbsGroups(projectId));
+      });
   }, [projectId]);
 
   useEffect(() => {
@@ -379,6 +391,10 @@ export default function CurrentWbsPage() {
         if (serverGroups.length > 0) {
           setGroups(serverGroups);
           saveWbsGroups(projectId, serverGroups);
+          void api.saveWbsMeta(projectId, {
+            milestones: [],
+            groups: serverGroups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
+          }).catch(() => undefined);
         }
         saveWbsSnapshot(projectId, snapshot);
       } catch (err) {
@@ -520,6 +536,10 @@ export default function CurrentWbsPage() {
       saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
       const assignments = rows.map((row) => ({ wbsId: row.wbsId, taskName: row.taskName, groupKey: row.groupKey || "" })).filter((assignment) => assignment.groupKey);
       saveWbsGroupAssignments(projectId, assignments);
+      await api.saveWbsMeta(projectId, {
+        milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
+        groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
+      });
       const parsed = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING, assignments);
       setRows(parsed);
       setSavedRows(parsed);

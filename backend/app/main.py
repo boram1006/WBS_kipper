@@ -20,6 +20,8 @@ from .schemas import (
     WbsChangeCandidate,
     WbsMapColumnsRequest,
     WbsMapColumnsResponse,
+    WbsMetaResponse,
+    WbsMetaSaveRequest,
     WbsUploadResponse,
 )
 from .services.meeting_analyzer import analyze_meeting_note
@@ -185,6 +187,54 @@ def get_latest_wbs(project_id: int) -> dict:
         _ensure_project(conn, project_id)
         rows = _get_wbs_rows(conn, project_id)
         return {"columns": WBS_FIELDS, "rows_preview": rows, "total_rows": len(rows)}
+
+
+@app.get("/api/projects/{project_id}/wbs/meta", response_model=WbsMetaResponse)
+def get_wbs_meta(project_id: int) -> dict:
+    with get_conn() as conn:
+        _ensure_project(conn, project_id)
+        milestone_rows = conn.execute(
+            'SELECT id, label, date, "order" FROM wbs_milestones WHERE project_id = ? ORDER BY "order"',
+            (project_id,),
+        ).fetchall()
+        group_rows = conn.execute(
+            'SELECT group_key, label, "order" FROM wbs_groups WHERE project_id = ? ORDER BY "order"',
+            (project_id,),
+        ).fetchall()
+        return {
+            "milestones": [dict(r) for r in milestone_rows],
+            "groups": [dict(r) for r in group_rows],
+        }
+
+
+@app.put("/api/projects/{project_id}/wbs/meta", response_model=WbsMetaResponse)
+def save_wbs_meta(project_id: int, payload: WbsMetaSaveRequest) -> dict:
+    with get_conn() as conn:
+        _ensure_project(conn, project_id)
+        conn.execute("DELETE FROM wbs_milestones WHERE project_id = ?", (project_id,))
+        for m in payload.milestones:
+            conn.execute(
+                'INSERT INTO wbs_milestones (id, project_id, label, date, "order") VALUES (?, ?, ?, ?, ?)',
+                (m.id, project_id, m.label, m.date, m.order),
+            )
+        conn.execute("DELETE FROM wbs_groups WHERE project_id = ?", (project_id,))
+        for g in payload.groups:
+            conn.execute(
+                'INSERT INTO wbs_groups (group_key, project_id, label, "order") VALUES (?, ?, ?, ?)',
+                (g.group_key, project_id, g.label, g.order),
+            )
+        milestone_rows = conn.execute(
+            'SELECT id, label, date, "order" FROM wbs_milestones WHERE project_id = ? ORDER BY "order"',
+            (project_id,),
+        ).fetchall()
+        group_rows = conn.execute(
+            'SELECT group_key, label, "order" FROM wbs_groups WHERE project_id = ? ORDER BY "order"',
+            (project_id,),
+        ).fetchall()
+        return {
+            "milestones": [dict(r) for r in milestone_rows],
+            "groups": [dict(r) for r in group_rows],
+        }
 
 
 @app.post("/api/projects/{project_id}/meetings/analyze", response_model=MeetingAnalyzeResponse)

@@ -11,6 +11,8 @@ import type {
   WbsChangeCandidate,
   WbsColumnMapping,
   WbsMapColumnsResponse,
+  WbsMetaResponse,
+  WbsMetaSaveRequest,
   WbsUploadResponse
 } from "@/lib/types";
 
@@ -98,5 +100,14 @@ export const api = {
 
   downloadWbsCsvText: (projectId: string | number) => requestText(`/api/projects/${projectId}/wbs/download`),
 
-  downloadWbsUrl: (projectId: string | number) => `${apiBase()}/api/projects/${projectId}/wbs/download`
+  downloadWbsUrl: (projectId: string | number) => `${apiBase()}/api/projects/${projectId}/wbs/download`,
+
+  getWbsMeta: (projectId: string | number) =>
+    request<WbsMetaResponse>(`/api/projects/${projectId}/wbs/meta`),
+
+  saveWbsMeta: (projectId: string | number, payload: WbsMetaSaveRequest) =>
+    request<WbsMetaResponse>(`/api/projects/${projectId}/wbs/meta`, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    })
 };
