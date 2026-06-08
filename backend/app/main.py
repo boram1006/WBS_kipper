@@ -188,11 +188,47 @@ def get_latest_wbs(project_id: int) -> dict:
         rows = _get_wbs_rows(conn, project_id)
         return {"columns": WBS_FIELDS, "rows_preview": rows, "total_rows": len(rows)}
 
+def _ensure_meta_tables(conn) -> None:
+    from .database import _table_columns
+    milestone_cols = _table_columns(conn, "wbs_milestones")
+    if not milestone_cols:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS wbs_milestones ("
+            "id TEXT NOT NULL, project_id BIGINT NOT NULL, label TEXT NOT NULL, "
+            "date TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, "
+            "PRIMARY KEY (project_id, id))"
+        )
+    elif "sort_order" not in milestone_cols:
+        conn.execute("DROP TABLE wbs_milestones")
+        conn.execute(
+            "CREATE TABLE wbs_milestones ("
+            "id TEXT NOT NULL, project_id BIGINT NOT NULL, label TEXT NOT NULL, "
+            "date TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, "
+            "PRIMARY KEY (project_id, id))"
+        )
+    group_cols = _table_columns(conn, "wbs_groups")
+    if not group_cols:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS wbs_groups ("
+            "group_key TEXT NOT NULL, project_id BIGINT NOT NULL, label TEXT NOT NULL, "
+            "sort_order INTEGER NOT NULL DEFAULT 0, "
+            "PRIMARY KEY (project_id, group_key))"
+        )
+    elif "sort_order" not in group_cols:
+        conn.execute("DROP TABLE wbs_groups")
+        conn.execute(
+            "CREATE TABLE wbs_groups ("
+            "group_key TEXT NOT NULL, project_id BIGINT NOT NULL, label TEXT NOT NULL, "
+            "sort_order INTEGER NOT NULL DEFAULT 0, "
+            "PRIMARY KEY (project_id, group_key))"
+        )
+
 
 @app.get("/api/projects/{project_id}/wbs/meta", response_model=WbsMetaResponse)
 def get_wbs_meta(project_id: int) -> dict:
     with get_conn() as conn:
         _ensure_project(conn, project_id)
+        _ensure_meta_tables(conn)
         milestone_rows = conn.execute(
             "SELECT id, label, date, sort_order FROM wbs_milestones WHERE project_id = ? ORDER BY sort_order",
             (project_id,),
@@ -211,6 +247,7 @@ def get_wbs_meta(project_id: int) -> dict:
 def save_wbs_meta(project_id: int, payload: WbsMetaSaveRequest) -> dict:
     with get_conn() as conn:
         _ensure_project(conn, project_id)
+        _ensure_meta_tables(conn)
         conn.execute("DELETE FROM wbs_milestones WHERE project_id = ?", (project_id,))
         for m in payload.milestones:
             conn.execute(
