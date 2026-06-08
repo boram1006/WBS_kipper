@@ -349,7 +349,9 @@ export default function CurrentWbsPage() {
     api.getWbsMeta(projectId)
       .then((meta) => {
         setMilestones(meta.milestones.map((m) => ({ id: m.id, label: m.label, date: m.date })));
-        setGroups(meta.groups.map((g) => ({ groupKey: g.group_key, label: g.label, order: g.order })));
+        if (meta.groups.length > 0) {
+          setGroups(meta.groups.map((g) => ({ groupKey: g.group_key, label: g.label, order: g.order })));
+        }
       })
       .catch(() => {
         setMilestones(loadWbsMilestones(projectId));
@@ -391,10 +393,6 @@ export default function CurrentWbsPage() {
         if (serverGroups.length > 0) {
           setGroups(serverGroups);
           saveWbsGroups(projectId, serverGroups);
-          void api.saveWbsMeta(projectId, {
-            milestones: [],
-            groups: serverGroups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
-          }).catch(() => undefined);
         }
         saveWbsSnapshot(projectId, snapshot);
       } catch (err) {
