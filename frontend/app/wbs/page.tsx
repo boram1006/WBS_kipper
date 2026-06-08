@@ -549,6 +549,10 @@ export default function CurrentWbsPage() {
       saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
       const assignments = rows.map((row) => ({ wbsId: row.wbsId, taskName: row.taskName, groupKey: row.groupKey || "" })).filter((assignment) => assignment.groupKey);
       saveWbsGroupAssignments(projectId, assignments);
+      await api.saveWbsMeta(projectId, {
+        milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
+        groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
+      });
       const parsed = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING, assignments);
       setRows(parsed);
       setSavedRows(parsed);
