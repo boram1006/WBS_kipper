@@ -194,16 +194,16 @@ def get_wbs_meta(project_id: int) -> dict:
     with get_conn() as conn:
         _ensure_project(conn, project_id)
         milestone_rows = conn.execute(
-            'SELECT id, label, date, "order" FROM wbs_milestones WHERE project_id = ? ORDER BY "order"',
+            "SELECT id, label, date, sort_order FROM wbs_milestones WHERE project_id = ? ORDER BY sort_order",
             (project_id,),
         ).fetchall()
         group_rows = conn.execute(
-            'SELECT group_key, label, "order" FROM wbs_groups WHERE project_id = ? ORDER BY "order"',
+            "SELECT group_key, label, sort_order FROM wbs_groups WHERE project_id = ? ORDER BY sort_order",
             (project_id,),
         ).fetchall()
         return {
-            "milestones": [dict(r) for r in milestone_rows],
-            "groups": [dict(r) for r in group_rows],
+            "milestones": [{"id": r["id"], "label": r["label"], "date": r["date"], "order": r["sort_order"]} for r in milestone_rows],
+            "groups": [{"group_key": r["group_key"], "label": r["label"], "order": r["sort_order"]} for r in group_rows],
         }
 
 
@@ -214,26 +214,26 @@ def save_wbs_meta(project_id: int, payload: WbsMetaSaveRequest) -> dict:
         conn.execute("DELETE FROM wbs_milestones WHERE project_id = ?", (project_id,))
         for m in payload.milestones:
             conn.execute(
-                'INSERT INTO wbs_milestones (id, project_id, label, date, "order") VALUES (?, ?, ?, ?, ?)',
+                "INSERT INTO wbs_milestones (id, project_id, label, date, sort_order) VALUES (?, ?, ?, ?, ?)",
                 (m.id, project_id, m.label, m.date, m.order),
             )
         conn.execute("DELETE FROM wbs_groups WHERE project_id = ?", (project_id,))
         for g in payload.groups:
             conn.execute(
-                'INSERT INTO wbs_groups (group_key, project_id, label, "order") VALUES (?, ?, ?, ?)',
+                "INSERT INTO wbs_groups (group_key, project_id, label, sort_order) VALUES (?, ?, ?, ?)",
                 (g.group_key, project_id, g.label, g.order),
             )
         milestone_rows = conn.execute(
-            'SELECT id, label, date, "order" FROM wbs_milestones WHERE project_id = ? ORDER BY "order"',
+            "SELECT id, label, date, sort_order FROM wbs_milestones WHERE project_id = ? ORDER BY sort_order",
             (project_id,),
         ).fetchall()
         group_rows = conn.execute(
-            'SELECT group_key, label, "order" FROM wbs_groups WHERE project_id = ? ORDER BY "order"',
+            "SELECT group_key, label, sort_order FROM wbs_groups WHERE project_id = ? ORDER BY sort_order",
             (project_id,),
         ).fetchall()
         return {
-            "milestones": [dict(r) for r in milestone_rows],
-            "groups": [dict(r) for r in group_rows],
+            "milestones": [{"id": r["id"], "label": r["label"], "date": r["date"], "order": r["sort_order"]} for r in milestone_rows],
+            "groups": [{"group_key": r["group_key"], "label": r["label"], "order": r["sort_order"]} for r in group_rows],
         }
 
 

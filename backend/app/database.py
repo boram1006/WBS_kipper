@@ -108,6 +108,7 @@ def get_conn() -> sqlite3.Connection | PostgresConnection:
 def init_db() -> None:
     with get_conn() as conn:
         _drop_legacy_tables(conn)
+        _drop_legacy_meta_tables(conn)
         conn.executescript(SCHEMA_SQL)
         _ensure_columns(
             conn,
@@ -166,6 +167,16 @@ def _ensure_columns(conn: sqlite3.Connection | PostgresConnection, table: str, c
     for column, definition in columns.items():
         if column not in existing:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {_column_definition(definition)}")
+
+
+def _drop_legacy_meta_tables(conn: sqlite3.Connection | PostgresConnection) -> None:
+    # Drop old wbs_milestones/wbs_groups tables that used "order" reserved word or INTEGER project_id
+    milestone_cols = _table_columns(conn, "wbs_milestones")
+    if milestone_cols and "sort_order" not in milestone_cols:
+        conn.execute("DROP TABLE IF EXISTS wbs_milestones")
+    group_cols = _table_columns(conn, "wbs_groups")
+    if group_cols and "sort_order" not in group_cols:
+        conn.execute("DROP TABLE IF EXISTS wbs_groups")
 
 
 def _drop_legacy_tables(conn: sqlite3.Connection | PostgresConnection) -> None:
