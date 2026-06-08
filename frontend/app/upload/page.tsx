@@ -610,9 +610,13 @@ export default function WbsSetupPage() {
         milestones: validMilestones().map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
         groups: groups.map((g, i) => ({ group_key: g.groupKey, label: g.label, order: i }))
       };
+      let metaSaveError: string | null = null;
       [snapshot] = await Promise.all([
         uploadStandardWbs(targetProjectId, file),
-        api.saveWbsMeta(targetProjectId, metaPayload).catch(() => undefined)
+        api.saveWbsMeta(targetProjectId, metaPayload).then(() => null).catch((e: unknown) => {
+          metaSaveError = e instanceof Error ? e.message : String(e);
+          return null;
+        })
       ]);
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
@@ -622,7 +626,12 @@ export default function WbsSetupPage() {
       );
       setIsCreatingNewWbs(false);
       setNewWbsName("");
-      setMessage("WBS가 저장되었습니다.");
+      if (metaSaveError) {
+        setMessage("WBS가 저장되었습니다.");
+        setError(`마일스톤/그룹 저장 실패: ${metaSaveError}`);
+      } else {
+        setMessage("WBS가 저장되었습니다.");
+      }
       router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "WBS를 저장하지 못했습니다. 다시 시도해 주세요.");
