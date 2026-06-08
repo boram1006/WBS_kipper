@@ -2,8 +2,7 @@
 
 import type { ComponentType } from "react";
 import { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronsUpDown, FileText, GitBranch, PanelLeftClose, PanelLeftOpen, Table2 } from "lucide-react";
 import { routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -19,7 +18,8 @@ function NavItem({
   label,
   active,
   badge,
-  collapsed
+  collapsed,
+  onClick
 }: {
   href: string;
   icon: ComponentType<{ className?: string }>;
@@ -27,58 +27,66 @@ function NavItem({
   active?: boolean;
   badge?: number;
   collapsed?: boolean;
+  onClick: () => void;
 }) {
   return (
-    <Link
-      href={href}
+    <button
+      type="button"
       title={collapsed ? label : undefined}
+      onClick={onClick}
       className={cn(
-        "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+        "relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
         collapsed && "justify-center px-2",
         active ? "bg-zinc-100 text-zinc-950" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950"
       )}
     >
       <Icon className={cn("h-4 w-4 shrink-0", active ? "text-zinc-900" : "text-zinc-500")} />
-      {!collapsed && <span className="flex-1">{label}</span>}
+      {!collapsed && <span className="flex-1 text-left">{label}</span>}
       {badge != null && badge > 0 && !collapsed && (
         <span className="min-w-[18px] rounded bg-zinc-950 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white tabular-nums">
           {badge}
         </span>
       )}
-    </Link>
+    </button>
   );
 }
 
 export function AppSidebar({ projectId }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
+  function navigate(href: string) {
+    router.push(href);
+    router.refresh();
+  }
 
   return (
     <div className={cn("relative shrink-0 transition-[width] duration-200", collapsed ? "w-[72px]" : "w-[240px]")}>
       <aside className={cn("flex h-full flex-col border-r border-zinc-200 bg-white py-5", collapsed ? "px-3" : "px-4")}>
         <div className={cn("mb-7 flex items-center gap-2", collapsed ? "justify-center" : "justify-start")}>
-          <Link href={routes.wbs(projectId)} className={cn("flex items-center gap-2.5 rounded-lg px-2 py-1 transition-colors hover:bg-zinc-100", collapsed && "justify-center")}>
+          <button type="button" onClick={() => navigate(routes.wbs(projectId))} className={cn("flex items-center gap-2.5 rounded-lg px-2 py-1 transition-colors hover:bg-zinc-100", collapsed && "justify-center")}>
             <div className="relative grid h-7 w-7 place-items-center rounded-lg bg-zinc-950 text-[11px] font-bold text-white">
               W
               <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#fd312e]" />
             </div>
             {!collapsed && <span className="text-[14px] font-semibold tracking-tight text-zinc-950">WBS Keeper</span>}
-          </Link>
+          </button>
         </div>
 
         <nav className="flex-1 space-y-5 overflow-y-auto">
           <div>
             {!collapsed && <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">WBS Workflow</p>}
             <div className="space-y-0.5">
-              <NavItem href={routes.wbs(projectId)} icon={Table2} label="WBS 현황" active={pathname === "/wbs"} collapsed={collapsed} />
-              <NavItem href={routes.meetingNote(projectId)} icon={FileText} label="회의록 분석" active={pathname === "/meeting-note"} collapsed={collapsed} />
+              <NavItem href={routes.wbs(projectId)} icon={Table2} label="WBS 현황" active={pathname === "/wbs"} collapsed={collapsed} onClick={() => navigate(routes.wbs(projectId))} />
+              <NavItem href={routes.meetingNote(projectId)} icon={FileText} label="회의록 분석" active={pathname === "/meeting-note"} collapsed={collapsed} onClick={() => navigate(routes.meetingNote(projectId))} />
             </div>
           </div>
 
           <div>
             {!collapsed && <p className="mb-2 px-2.5 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400">Project</p>}
             <div className="space-y-0.5">
-              <NavItem href={routes.upload(projectId)} icon={GitBranch} label="WBS 설정" active={pathname === "/upload"} collapsed={collapsed} />
+              <NavItem href={routes.upload(projectId)} icon={GitBranch} label="WBS 설정" active={pathname === "/upload"} collapsed={collapsed} onClick={() => navigate(routes.upload(projectId))} />
             </div>
           </div>
         </nav>
