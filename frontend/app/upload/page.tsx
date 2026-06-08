@@ -49,7 +49,6 @@ import {
   loadWbsSnapshot,
   saveWbsGroupAssignments,
   saveWbsGroups,
-  saveWbsMilestones,
   saveWbsSnapshot,
   type WbsGroupAssignment,
   type WbsMilestone
@@ -307,8 +306,33 @@ export default function WbsSetupPage() {
   const canSaveNewWbs = canSave && newWbsName.trim().length > 0;
 
   useEffect(() => {
-    setMilestones(projectId ? loadWbsMilestones(projectId) : []);
-    setGroups(projectId ? loadWbsGroups(projectId) : []);
+    if (!projectId) {
+      setMilestones([]);
+      setGroups([]);
+      return;
+    }
+    api.getWbsMeta(projectId)
+      .then((meta) => {
+        if (meta.milestones.length > 0) {
+          setMilestones(meta.milestones.map((m) => ({ id: m.id, label: m.label, date: m.date })));
+        } else {
+          const local = loadWbsMilestones(projectId);
+          setMilestones(local);
+          if (local.length > 0) {
+            void api.saveWbsMeta(projectId, {
+              milestones: local.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
+              groups: meta.groups.map((g) => ({ group_key: g.group_key, label: g.label, order: g.order }))
+            }).catch(() => undefined);
+          }
+        }
+        if (meta.groups.length > 0) {
+          setGroups(meta.groups.map((g) => ({ groupKey: g.group_key, label: g.label, order: g.order })));
+        }
+      })
+      .catch(() => {
+        setMilestones(loadWbsMilestones(projectId));
+        setGroups(loadWbsGroups(projectId));
+      });
   }, [projectId]);
 
   useEffect(() => {
@@ -321,7 +345,9 @@ export default function WbsSetupPage() {
       const resolvedGroups = serverGroups.length > 0 ? serverGroups : inferGroupsFromTasks(nextRows.map((row) => ({ ...row, wbsId: row.wbs_id, id: row.wbs_id })), savedGroups);
       setRows(nextRows);
       setGroups(resolvedGroups);
-      if (serverGroups.length > 0 && projectId) saveWbsGroups(projectId, serverGroups);
+      if (serverGroups.length > 0 && projectId) {
+        saveWbsGroups(projectId, serverGroups);
+      }
       setUploadedColumns([...STANDARD_COLUMN_KEYS]);
       setFileName("Saved WBS");
       setIsCreatingNewWbs(false);
@@ -585,12 +611,14 @@ export default function WbsSetupPage() {
       }
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
-      saveWbsGroups(targetProjectId, groups);
       saveWbsGroupAssignments(
         targetProjectId,
         rows.map((row) => ({ wbsId: row.wbs_id, taskName: row.task_name, groupKey: row.groupKey }))
       );
-      saveWbsMilestones(targetProjectId, validMilestones());
+      await api.saveWbsMeta(targetProjectId, {
+        milestones: validMilestones().map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
+        groups: groups.map((g, i) => ({ group_key: g.groupKey, label: g.label, order: i }))
+      });
       setIsCreatingNewWbs(false);
       setNewWbsName("");
       setMessage("WBS가 저장되었습니다.");

@@ -137,6 +137,13 @@ export type ChangeHistoryResponse = {
   history: ChangeHistoryItem[];
 };
 
+export type WbsMetaResponse = {
+  milestones: { id: string; label: string; date: string; order: number }[];
+  groups: { group_key: string; label: string; order: number }[];
+};
+
+export type WbsMetaSaveRequest = WbsMetaResponse;
+
 export type DemoStartResponse = {
   project: ProjectResponse;
   meeting_id: number;
