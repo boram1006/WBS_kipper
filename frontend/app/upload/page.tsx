@@ -612,7 +612,7 @@ export default function WbsSetupPage() {
       };
       [snapshot] = await Promise.all([
         uploadStandardWbs(targetProjectId, file),
-        api.saveWbsMeta(targetProjectId, metaPayload)
+        api.saveWbsMeta(targetProjectId, metaPayload).catch(() => undefined)
       ]);
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);

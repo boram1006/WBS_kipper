@@ -539,20 +539,17 @@ export default function CurrentWbsPage() {
     setMessage(null);
     try {
       const groupLabelByKey = new Map(groups.map((g) => [g.groupKey, g.label]));
+      const metaPayload = {
+        milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
+        groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
+      };
       const [snapshot] = await Promise.all([
         uploadStandardWbs(projectId, rows, groupLabelByKey),
-        api.saveWbsMeta(projectId, {
-          milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
-          groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
-        })
+        api.saveWbsMeta(projectId, metaPayload).catch(() => undefined)
       ]);
       saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
       const assignments = rows.map((row) => ({ wbsId: row.wbsId, taskName: row.taskName, groupKey: row.groupKey || "" })).filter((assignment) => assignment.groupKey);
       saveWbsGroupAssignments(projectId, assignments);
-      await api.saveWbsMeta(projectId, {
-        milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
-        groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
-      });
       const parsed = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING, assignments);
       setRows(parsed);
       setSavedRows(parsed);

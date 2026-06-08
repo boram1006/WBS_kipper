@@ -82,19 +82,19 @@ CREATE TABLE IF NOT EXISTS risks (
 
 CREATE TABLE IF NOT EXISTS wbs_milestones (
     id TEXT NOT NULL,
-    project_id INTEGER NOT NULL,
+    project_id BIGINT NOT NULL,
     label TEXT NOT NULL,
     date TEXT NOT NULL,
-    "order" INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, id),
     FOREIGN KEY(project_id) REFERENCES projects(id)
 );
 
 CREATE TABLE IF NOT EXISTS wbs_groups (
     group_key TEXT NOT NULL,
-    project_id INTEGER NOT NULL,
+    project_id BIGINT NOT NULL,
     label TEXT NOT NULL,
-    "order" INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, group_key),
     FOREIGN KEY(project_id) REFERENCES projects(id)
 );
