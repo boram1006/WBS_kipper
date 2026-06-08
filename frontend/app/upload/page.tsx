@@ -181,10 +181,8 @@ function csvFileFromRows(rows: WbsEditableRow[], groupLabelByKey?: Map<string, s
   return new File([`\uFEFF${rowsToCsv(rows, groupLabelByKey)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
 }
 
-async function uploadAndMapStandardWbs(projectId: string, file: File) {
-  const snapshot = await api.uploadWbs(projectId, file);
-  await api.mapWbsColumns(projectId, STANDARD_MAPPING);
-  return snapshot;
+async function uploadStandardWbs(projectId: string, file: File) {
+  return api.uploadWbs(projectId, file);
 }
 
 function parseCsv(text: string): string[][] {
@@ -593,10 +591,10 @@ export default function WbsSetupPage() {
         });
         targetProjectId = String(project.id);
         setActiveProjectId(targetProjectId);
-        snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
       } else {
         try {
-          snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
+          // probe: fails fast if project doesn't exist
+          await api.getWbs(targetProjectId);
         } catch (err) {
           const detail = err instanceof Error ? err.message : "";
           if (!detail.includes("Project not found") && !detail.includes("404")) throw err;
@@ -606,19 +604,22 @@ export default function WbsSetupPage() {
           });
           targetProjectId = String(project.id);
           setActiveProjectId(targetProjectId);
-          snapshot = await uploadAndMapStandardWbs(targetProjectId, file);
         }
       }
+      const metaPayload = {
+        milestones: validMilestones().map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
+        groups: groups.map((g, i) => ({ group_key: g.groupKey, label: g.label, order: i }))
+      };
+      [snapshot] = await Promise.all([
+        uploadStandardWbs(targetProjectId, file),
+        api.saveWbsMeta(targetProjectId, metaPayload)
+      ]);
       setActiveProjectId(targetProjectId);
       if (snapshot) saveWbsSnapshot(targetProjectId, snapshot, STANDARD_MAPPING);
       saveWbsGroupAssignments(
         targetProjectId,
         rows.map((row) => ({ wbsId: row.wbs_id, taskName: row.task_name, groupKey: row.groupKey }))
       );
-      await api.saveWbsMeta(targetProjectId, {
-        milestones: validMilestones().map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
-        groups: groups.map((g, i) => ({ group_key: g.groupKey, label: g.label, order: i }))
-      });
       setIsCreatingNewWbs(false);
       setNewWbsName("");
       setMessage("WBS가 저장되었습니다.");

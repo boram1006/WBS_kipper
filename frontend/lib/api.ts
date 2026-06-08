@@ -26,18 +26,30 @@ function apiBase() {
   return "https://wbs-kipper-api.onrender.com";
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBase()}${path}`, {
-    ...init,
-    headers: init?.body instanceof FormData ? init.headers : { "Content-Type": "application/json", ...init?.headers },
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Request failed: ${response.status}`);
+async function request<T>(path: string, init?: RequestInit, retries = 2): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 40_000);
+  try {
+    const response = await fetch(`${apiBase()}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: init?.body instanceof FormData ? init.headers : { "Content-Type": "application/json", ...init?.headers },
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Request failed: ${response.status}`);
+    }
+    return response.json() as Promise<T>;
+  } catch (err) {
+    if (retries > 0 && (err instanceof TypeError || (err instanceof DOMException && err.name === "AbortError"))) {
+      await new Promise((r) => setTimeout(r, 2000));
+      return request(path, init, retries - 1);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.json() as Promise<T>;
 }
 
 async function requestText(path: string, init?: RequestInit): Promise<string> {

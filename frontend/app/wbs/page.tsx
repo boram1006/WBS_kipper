@@ -151,10 +151,8 @@ function csvFileFromRows(rows: WbsRow[], groupLabelByKey?: Map<string, string>) 
   return new File([`\uFEFF${rowsToCsv(rows, groupLabelByKey)}`], "wbs-standard-template.csv", { type: "text/csv;charset=utf-8" });
 }
 
-async function uploadAndMapStandardWbs(projectId: string, rows: WbsRow[], groupLabelByKey?: Map<string, string>) {
-  const snapshot = await api.uploadWbs(projectId, csvFileFromRows(rows, groupLabelByKey));
-  await api.mapWbsColumns(projectId, STANDARD_MAPPING);
-  return snapshot;
+async function uploadStandardWbs(projectId: string, rows: WbsRow[], groupLabelByKey?: Map<string, string>) {
+  return api.uploadWbs(projectId, csvFileFromRows(rows, groupLabelByKey));
 }
 
 function normalizeDateValue(value: string) {
@@ -541,14 +539,16 @@ export default function CurrentWbsPage() {
     setMessage(null);
     try {
       const groupLabelByKey = new Map(groups.map((g) => [g.groupKey, g.label]));
-      const snapshot = await uploadAndMapStandardWbs(projectId, rows, groupLabelByKey);
+      const [snapshot] = await Promise.all([
+        uploadStandardWbs(projectId, rows, groupLabelByKey),
+        api.saveWbsMeta(projectId, {
+          milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
+          groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
+        })
+      ]);
       saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
       const assignments = rows.map((row) => ({ wbsId: row.wbsId, taskName: row.taskName, groupKey: row.groupKey || "" })).filter((assignment) => assignment.groupKey);
       saveWbsGroupAssignments(projectId, assignments);
-      await api.saveWbsMeta(projectId, {
-        milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
-        groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
-      });
       const parsed = normalizeRawRows(snapshot.rows_preview, STANDARD_MAPPING, assignments);
       setRows(parsed);
       setSavedRows(parsed);
