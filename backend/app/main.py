@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from .config import settings
-from .database import dumps, get_conn, init_db, loads
+from .database import _table_columns, dumps, get_conn, init_db, loads
 from .models import WBS_FIELDS
 from .schemas import (
     ApplyChangesRequest,
@@ -39,6 +39,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    origin = request.headers.get("origin", "*")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"},
+    )
 
 
 @app.on_event("startup")
@@ -189,7 +199,6 @@ def get_latest_wbs(project_id: int) -> dict:
         return {"columns": WBS_FIELDS, "rows_preview": rows, "total_rows": len(rows)}
 
 def _ensure_meta_tables(conn) -> None:
-    from .database import _table_columns
     milestone_cols = _table_columns(conn, "wbs_milestones")
     if not milestone_cols:
         conn.execute(
