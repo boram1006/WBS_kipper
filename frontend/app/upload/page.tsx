@@ -629,10 +629,11 @@ export default function WbsSetupPage() {
       if (metaSaveError) {
         setMessage("WBS가 저장되었습니다.");
         setError(`마일스톤/그룹 저장 실패: ${metaSaveError}`);
+        // 에러가 있으면 페이지 이동 안 함 — 사용자가 에러 확인 후 직접 이동
       } else {
         setMessage("WBS가 저장되었습니다.");
+        router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
       }
-      router.push(continueToMeeting ? routes.meetingNote(targetProjectId) : routes.wbs(targetProjectId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "WBS를 저장하지 못했습니다. 다시 시도해 주세요.");
     } finally {
