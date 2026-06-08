@@ -85,6 +85,23 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.post("/api/admin/fix-wbs-ids")
+def fix_wbs_ids() -> dict:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id, wbs_id, raw_json FROM wbs_rows").fetchall()
+        fixed = []
+        for row in rows:
+            current_id = str(row["wbs_id"]).strip()
+            if not current_id.lstrip("-").isdigit():
+                continue
+            raw = loads(row["raw_json"]) or {}
+            fixed_id = _value(raw, None, ["task id", "wbs id", "id", "_row_id"])
+            if fixed_id and not fixed_id.lstrip("-").isdigit():
+                conn.execute("UPDATE wbs_rows SET wbs_id = ? WHERE id = ?", (fixed_id, row["id"]))
+                fixed.append({"row_id": row["id"], "old": current_id, "new": fixed_id})
+    return {"fixed": fixed, "count": len(fixed)}
+
+
 @app.post("/api/projects", response_model=ProjectResponse)
 def create_project(payload: ProjectCreateRequest) -> dict:
     with get_conn() as conn:
