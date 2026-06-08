@@ -543,9 +543,9 @@ export default function CurrentWbsPage() {
         milestones: milestones.map((m, i) => ({ id: m.id, label: m.label, date: m.date, order: i })),
         groups: groups.map((g) => ({ group_key: g.groupKey, label: g.label, order: g.order }))
       };
-      const [snapshot] = await Promise.all([
+      const [snapshot, metaSaveError] = await Promise.all([
         uploadStandardWbs(projectId, rows, groupLabelByKey),
-        api.saveWbsMeta(projectId, metaPayload).catch(() => undefined)
+        api.saveWbsMeta(projectId, metaPayload).then(() => null).catch((e: unknown) => e instanceof Error ? e.message : String(e))
       ]);
       saveWbsSnapshot(projectId, snapshot, STANDARD_MAPPING);
       const assignments = rows.map((row) => ({ wbsId: row.wbsId, taskName: row.taskName, groupKey: row.groupKey || "" })).filter((assignment) => assignment.groupKey);
@@ -554,7 +554,11 @@ export default function CurrentWbsPage() {
       setRows(parsed);
       setSavedRows(parsed);
       setMode("view");
-      setMessage("WBS 변경사항이 저장되었습니다.");
+      if (metaSaveError) {
+        setError(`WBS 행은 저장됐지만 마일스톤/그룹 저장 실패: ${metaSaveError}`);
+      } else {
+        setMessage("WBS 변경사항이 저장되었습니다.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "WBS 변경사항을 저장하지 못했습니다.");
     } finally {

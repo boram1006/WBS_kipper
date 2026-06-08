@@ -1,3 +1,5 @@
+import logging
+import traceback
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -29,6 +31,7 @@ from .services.update_applier import apply_approved_changes
 from .services.wbs import parse_wbs, rows_to_csv
 
 app = FastAPI(title="WBS Update Agent MVP")
+logger = logging.getLogger(__name__)
 DEFAULT_PROJECT_NAME = "webOS UX"
 
 app.add_middleware(
@@ -43,10 +46,12 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    tb = traceback.format_exc()
+    logger.error("Unhandled exception on %s %s:\n%s", request.method, request.url.path, tb)
     origin = request.headers.get("origin", "*")
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
+        content={"detail": str(exc), "traceback": tb},
         headers={"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"},
     )
 
